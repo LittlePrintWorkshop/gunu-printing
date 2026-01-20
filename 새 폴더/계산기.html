@@ -1,0 +1,2042 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>작은인쇄공방 - 인디고 / 흑백 디지털 / 대량 옵셋 책자 계산기</title>
+
+    <style>
+        :root{
+            --bg:#f4f4f5;
+            --card-bg:#ffffff;
+            --primary:#2563eb;
+            --primary-dark:#1d4ed8;
+            --border:#e5e7eb;
+            --text-main:#111827;
+            --text-sub:#6b7280;
+        }
+
+        *{
+            box-sizing:border-box;
+        }
+
+        body{
+            margin:0;
+            padding:32px 16px 40px;
+            background:var(--bg);
+            font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic",sans-serif;
+            color:var(--text-main);
+        }
+
+        .layout{
+            max-width:1200px;
+            margin:0 auto;
+            display:flex;
+            gap:24px;
+            align-items:flex-start;
+        }
+
+        .sidebar{
+            width:230px;
+            background:#ffffff;
+            border-radius:16px;
+            box-shadow:0 4px 16px rgba(15,23,42,0.12);
+            padding:18px 18px 20px;
+        }
+
+        .sidebar-title{
+            font-size:18px;
+            font-weight:700;
+            margin-bottom:10px;
+        }
+
+        .category-list{
+            list-style:none;
+            margin:0;
+            padding:0;
+            display:flex;
+            flex-direction:column;
+            gap:8px;
+        }
+
+        .category-item{
+            display:flex;
+            align-items:center;
+            gap:10px;
+            padding:9px 10px;
+            border-radius:12px;
+            cursor:pointer;
+            border:1px solid transparent;
+            transition:background 0.15s,border 0.15s,box-shadow 0.15s;
+        }
+
+        .category-item:hover{
+            background:#f3f6ff;
+            border-color:#d5e0ff;
+        }
+
+        .category-item.active{
+            background:#e7f0ff;
+            border-color:#2563eb;
+            box-shadow:0 2px 8px rgba(37,99,235,0.25);
+        }
+
+        .category-dot{
+            width:10px;
+            height:10px;
+            border-radius:50%;
+            border:2px solid #9ca3af;
+        }
+
+        .category-item.active .category-dot{
+            border-color:#2563eb;
+            background:#2563eb;
+        }
+
+        .category-text-main{
+            font-size:14px;
+            font-weight:600;
+        }
+
+        .category-text-sub{
+            font-size:11px;
+            color:#6b7280;
+            margin-top:1px;
+        }
+
+        .main-area{
+            flex:1;
+        }
+
+        .panel{
+            display:none;
+        }
+        .panel.active{
+            display:block;
+        }
+
+        .card{
+            background:var(--card-bg);
+            border-radius:18px;
+            box-shadow:0 10px 30px rgba(15,23,42,0.12);
+            padding:24px 26px 26px;
+        }
+
+        .panel h1{
+            font-size:22px;
+            margin:0 0 6px;
+        }
+
+        .panel-desc{
+            font-size:13px;
+            color:var(--text-sub);
+            margin-bottom:18px;
+        }
+
+        .section{
+            border-bottom:1px solid var(--border);
+            padding:16px 0;
+        }
+        .section:last-of-type{
+            border-bottom:none;
+            padding-bottom:8px;
+        }
+
+        .section-header{
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin-bottom:10px;
+        }
+
+        .section-index{
+            width:22px;
+            height:22px;
+            border-radius:999px;
+            background:var(--primary);
+            color:#ffffff;
+            font-size:13px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-weight:600;
+        }
+
+        .section-title{
+            font-size:15px;
+            font-weight:700;
+        }
+
+        .section-sub{
+            font-size:12px;
+            color:var(--text-sub);
+            margin-top:2px;
+        }
+
+        .field-grid{
+            display:grid;
+            grid-template-columns:repeat(2,minmax(0,1fr));
+            gap:14px 18px;
+        }
+
+        .field-full{
+            grid-column:1 / -1;
+        }
+
+        label{
+            display:block;
+            font-size:13px;
+            font-weight:600;
+            margin-bottom:4px;
+        }
+
+        input[type="number"],
+        select{
+            width:100%;
+            padding:8px 10px;
+            border-radius:9px;
+            border:1px solid #d1d5db;
+            font-size:14px;
+            outline:none;
+            transition:border 0.12s, box-shadow 0.12s;
+        }
+
+        input:focus,
+        select:focus{
+            border-color:var(--primary);
+            box-shadow:0 0 0 1px rgba(37,99,235,0.25);
+        }
+
+        .radio-group{
+            display:flex;
+            flex-wrap:wrap;
+            gap:8px 14px;
+        }
+
+        .radio-pill{
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            padding:6px 10px;
+            border-radius:999px;
+            border:1px solid #d4d4d8;
+            cursor:pointer;
+            background:#f9fafb;
+            font-size:13px;
+            font-weight:500;
+            white-space:nowrap;
+            transition:background 0.12s,border 0.12s;
+        }
+
+        .radio-pill input{
+            margin:0;
+        }
+
+        .radio-pill:hover{
+            background:#eef2ff;
+            border-color:#c7d2fe;
+        }
+
+        .paper-row{
+            display:flex;
+            gap:8px;
+        }
+        .paper-row select{
+            width:100%;
+        }
+
+        .hint{
+            font-size:11px;
+            color:#6b7280;
+            margin-top:2px;
+        }
+
+        .btn-primary{
+            width:100%;
+            margin-top:18px;
+            padding:12px 0;
+            border:none;
+            border-radius:12px;
+            font-size:16px;
+            font-weight:600;
+            cursor:pointer;
+            background:var(--primary);
+            color:#ffffff;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:8px;
+            box-shadow:0 8px 24px rgba(37,99,235,0.35);
+            transition:background 0.15s,box-shadow 0.15s,transform 0.08s;
+        }
+
+        .btn-primary:hover{
+            background:var(--primary-dark);
+            box-shadow:0 9px 26px rgba(37,99,235,0.42);
+            transform:translateY(-1px);
+        }
+
+        .btn-primary:active{
+            transform:translateY(0);
+            box-shadow:0 5px 18px rgba(37,99,235,0.3);
+        }
+
+        .calc-result{
+            margin-top:16px;
+            padding:14px 16px;
+            border-radius:10px;
+            background:#020617;
+            color:#e5e7eb;
+            font-family:"JetBrains Mono","Menlo","Consolas",monospace;
+            font-size:13px;
+            line-height:1.7;
+            white-space:pre-line;
+            max-height:420px;
+            overflow:auto;
+        }
+
+        .result-label{
+            font-size:11px;
+            color:#9ca3af;
+            margin-bottom:4px;
+        }
+
+        /* 옵셋 패널 추가 레이아웃(메모 박스 우측) */
+        .offset-layout{
+            display:flex;
+            gap:20px;
+            align-items:flex-start;
+        }
+        .offset-main{
+            flex:1;
+            min-width:0;
+        }
+        .offset-memo{
+            width:240px;
+            background:#ffffff;
+            border-radius:16px;
+            box-shadow:0 4px 16px rgba(0,0,0,0.08);
+            padding:18px 16px;
+            box-sizing:border-box;
+            font-size:13px;
+            color:#4b5563;
+            line-height:1.6;
+        }
+        .offset-memo-title{
+            font-size:15px;
+            font-weight:700;
+            margin-bottom:8px;
+        }
+        .offset-memo p{
+            margin:4px 0;
+        }
+
+        /* 옵셋 전용 필드 (이름 겹침 방지용으로 prefix는 class만) */
+        .offset-row{
+            display:flex;
+            gap:10px;
+            margin-bottom:10px;
+        }
+        .offset-field{
+            flex:1;
+            min-width:0;
+        }
+        #offset-result{
+            margin-top:16px;
+            padding:14px 16px;
+            border-radius:10px;
+            background:#020617;
+            color:#e5e7eb;
+            font-family:"JetBrains Mono","Menlo","Consolas",monospace;
+            font-size:13px;
+            line-height:1.6;
+            white-space:pre-line;
+            max-height:420px;
+            overflow:auto;
+        }
+
+        @media (max-width:900px){
+            body{ padding:18px 10px 30px; }
+            .layout{ flex-direction:column; }
+            .sidebar{ width:100%; position:static; }
+            .field-grid{ grid-template-columns:1fr; }
+            .offset-layout{ flex-direction:column; }
+            .offset-memo{ width:100%; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="layout">
+    <aside class="sidebar">
+        <div class="sidebar-title">책자 인쇄 방식</div>
+        <ul class="category-list">
+            <li class="category-item active" data-panel="panel-indigo">
+                <div class="category-dot"></div>
+                <div>
+                    <div class="category-text-main">소량 인디고 책자</div>
+                    <div class="category-text-sub">464×315 인디고, 칼라/흑백</div>
+                </div>
+            </li>
+            <li class="category-item" data-panel="panel-digital">
+                <div class="category-dot"></div>
+                <div>
+                    <div class="category-text-main">흑백 디지털 책자</div>
+                    <div class="category-text-sub">내지 흑백 디지털, 표지 인디고</div>
+                </div>
+            </li>
+            <li class="category-item" data-panel="panel-offset">
+                <div class="category-dot"></div>
+                <div>
+                    <div class="category-text-main">대량 옵셋 책자</div>
+                    <div class="category-text-sub">국전/2절/4×6 전지, 폼단위 계산</div>
+                </div>
+            </li>
+        </ul>
+    </aside>
+
+    <main class="main-area">
+
+        <!-- 인디고 패널 -->
+        <section id="panel-indigo" class="panel active">
+            <div class="card">
+                <h1>소량 인디고 책자 계산기</h1>
+                <div class="panel-desc">
+                    인디고 464×315 기준 클릭단가(칼라/흑백)와 A3 종이값·제본비·마진/부가세를 반영한 책자 견적입니다.
+                    내지 페이지는 <b>표지 제외 A4 페이지 수</b>로 입력합니다. (표지는 아래에서 단면 2p / 양면 4p 선택)
+                </div>
+
+                <!-- 1. 기본 정보 -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-index">1</div>
+                        <div>
+                            <div class="section-title">기본 정보</div>
+                            <div class="section-sub">제본 방식, 사이즈, 내지 페이지 수, 부수를 설정합니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div class="field-full">
+                            <label>제본 방식</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-bind" value="staple" checked>
+                                    <span>중철 제본 (권당 200원)</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-bind" value="perfect">
+                                    <span>무선 제본 (권당 400원, 최소 30p)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>사이즈</label>
+                            <select id="ind-bookSize">
+                                <option value="A4">A4 (210×297)</option>
+                                <option value="A5">A5 (148×210)</option>
+                                <option value="B5">B5 (182×257)</option>
+                            </select>
+                            <div class="hint">상자당 넣을 수량 계산에만 사용됩니다.</div>
+                        </div>
+
+                        <div>
+                            <label>부수</label>
+                            <input type="number" id="ind-qty" min="1">
+                        </div>
+
+                        <div class="field-full">
+                            <label>내지 페이지 수 (A4, 표지 제외)</label>
+                            <input type="number" id="ind-innerPages" min="4" step="2">
+                            <div class="hint">
+                                예) 내지 26p + 표지 양면 4p → 총 30p (무선 최소 30p 자동 보정)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 표지 설정 -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-index">2</div>
+                        <div>
+                            <div class="section-title">표지 설정 (인디고)</div>
+                            <div class="section-sub">
+                                464×315 인디고 기준 A3 1장당 클릭비와 종이값을 사용합니다.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div>
+                            <label>표지 인쇄 방식</label>
+                            <div class="hint">
+                                칼라: 단면 100원 / 양면 200원<br>
+                                흑백: 단면 20원 / 양면 40원
+                            </div>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-coverPrint" value="1">
+                                    <span>단면 (2p)</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-coverPrint" value="2" checked>
+                                    <span>양면 (4p)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>표지 색상</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-coverColor" value="color" checked>
+                                    <span>칼라</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-coverColor" value="mono">
+                                    <span>흑백</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>표지 용지</label>
+                            <div class="paper-row">
+                                <select id="ind-coverType"></select>
+                                <select id="ind-coverGram"></select>
+                            </div>
+                            <div class="hint">초기값: 스노우지 200g</div>
+                        </div>
+
+                        <div>
+                            <label>표지 코팅</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-coat" value="0" checked>
+                                    <span>없음</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-coat" value="1">
+                                    <span>코팅 (권당 300원 가산)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 내지 설정 -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-index">3</div>
+                        <div>
+                            <div class="section-title">내지 설정 (인디고)</div>
+                            <div class="section-sub">
+                                양면은 A3 1장에 A4 4페이지, 단면은 A3 1장에 A4 2페이지로 계산합니다.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div>
+                            <label>내지 인쇄 방식</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-innerPrint" value="1">
+                                    <span>단면</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-innerPrint" value="2" checked>
+                                    <span>양면</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>내지 색상</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-innerColor" value="color" checked>
+                                    <span>칼라</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-innerColor" value="mono">
+                                    <span>흑백</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>내지 용지</label>
+                            <div class="paper-row">
+                                <select id="ind-innerType"></select>
+                                <select id="ind-innerGram"></select>
+                            </div>
+                            <div class="hint">초기값: 스노우지 150g</div>
+                        </div>
+
+                        <div></div>
+                    </div>
+                </div>
+
+                <!-- 4. 판매가 -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-index">4</div>
+                        <div>
+                            <div class="section-title">판매가 / 부가세</div>
+                            <div class="section-sub">
+                                원가에 마진을 적용한 뒤, 부가세 포함/별도를 선택합니다. 배송비는 별도입니다.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div>
+                            <label>마진율 (%)</label>
+                            <input type="number" id="ind-marginRate" value="100" min="0" step="1">
+                            <div class="hint">예: 100 → 원가 × 2.0 후 10원 단위 절삭</div>
+                        </div>
+                        <div>
+                            <label>부가세</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-vat" value="add" checked>
+                                    <span>부가세 10% 포함</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="ind-vat" value="none">
+                                    <span>부가세 별도</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-primary" onclick="calculateIndigo()">인디고 책자 계산하기</button>
+
+                <div class="calc-result" id="ind-result">
+                    <div class="result-label">계산 결과</div>
+                    인디고 책자 조건을 입력한 뒤 [계산하기]를 눌러 주세요.
+                </div>
+            </div>
+        </section>
+        <!-- 흑백 디지털 패널 -->
+        <section id="panel-digital" class="panel">
+            <div class="card">
+                <h1>흑백 디지털 책자 계산기</h1>
+                <div class="panel-desc">
+                    내지는 464×315 흑백 디지털(단면 10원 / 양면 20원), 표지는 인디고(칼라/흑백 선택)로 계산합니다.
+                    종이값은 동일하게 A3 1장 단가표를 사용합니다.
+                </div>
+
+                <!-- 1. 기본 정보 -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-index">1</div>
+                        <div>
+                            <div class="section-title">기본 정보</div>
+                            <div class="section-sub">제본 방식·사이즈·부수·내지 페이지를 설정합니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div class="field-full">
+                            <label>제본 방식</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-bind" value="staple" checked>
+                                    <span>중철 제본 (권당 200원)</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-bind" value="perfect">
+                                    <span>무선 제본 (권당 400원, 최소 30p)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>사이즈</label>
+                            <select id="dig-bookSize">
+                                <option value="A4">A4 (210×297)</option>
+                                <option value="A5">A5 (148×210)</option>
+                                <option value="B5">B5 (182×257)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label>부수</label>
+                            <input type="number" id="dig-qty" min="1">
+                        </div>
+
+                        <div class="field-full">
+                            <label>내지 페이지 수 (A4, 표지 제외)</label>
+                            <input type="number" id="dig-innerPages" min="4" step="2">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. 표지 설정 -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-index">2</div>
+                        <div>
+                            <div class="section-title">표지 설정 (인디고)</div>
+                            <div class="section-sub">표지는 인디고 출력 단가를 그대로 사용합니다.</div>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div>
+                            <label>표지 인쇄 방식</label>
+                            <div class="hint">칼라: 100/200원 · 흑백: 20/40원 (단면/양면)</div>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-coverPrint" value="1">
+                                    <span>단면 (2p)</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-coverPrint" value="2" checked>
+                                    <span>양면 (4p)</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>표지 색상</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-coverColor" value="color" checked>
+                                    <span>칼라</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-coverColor" value="mono">
+                                    <span>흑백</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>표지 용지</label>
+                            <div class="paper-row">
+                                <select id="dig-coverType"></select>
+                                <select id="dig-coverGram"></select>
+                            </div>
+                            <div class="hint">초기값: 스노우지 200g</div>
+                        </div>
+
+                        <div>
+                            <label>표지 코팅</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-coat" value="0" checked>
+                                    <span>없음</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-coat" value="1">
+                                    <span>코팅 (권당 300원)</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. 내지 설정 -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-index">3</div>
+                        <div>
+                            <div class="section-title">내지 설정 (흑백 디지털)</div>
+                            <div class="section-sub">
+                                내지는 흑백 디지털 출력 전용입니다. 단면 10원 / 양면 20원 (A3 1장 기준).
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div>
+                            <label>내지 인쇄 방식</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-innerPrint" value="1">
+                                    <span>단면</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-innerPrint" value="2" checked>
+                                    <span>양면</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>내지 색상</label>
+                            <div class="hint">항상 흑백 디지털로 계산됩니다.</div>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" checked disabled>
+                                    <span>흑백 디지털</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label>내지 용지</label>
+                            <div class="paper-row">
+                                <select id="dig-innerType"></select>
+                                <select id="dig-innerGram"></select>
+                            </div>
+                            <div class="hint">초기값: 스노우지 150g</div>
+                        </div>
+
+                        <div></div>
+                    </div>
+                </div>
+
+                <!-- 4. 판매가 -->
+                <div class="section">
+                    <div class="section-header">
+                        <div class="section-index">4</div>
+                        <div>
+                            <div class="section-title">판매가 / 부가세</div>
+                        </div>
+                    </div>
+
+                    <div class="field-grid">
+                        <div>
+                            <label>마진율 (%)</label>
+                            <input type="number" id="dig-marginRate" value="100" min="0" step="1">
+                        </div>
+                        <div>
+                            <label>부가세</label>
+                            <div class="radio-group">
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-vat" value="add" checked>
+                                    <span>부가세 10% 포함</span>
+                                </label>
+                                <label class="radio-pill">
+                                    <input type="radio" name="dig-vat" value="none">
+                                    <span>부가세 별도</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="button" class="btn-primary" onclick="calculateDigital()">흑백 디지털 책자 계산하기</button>
+
+                <div class="calc-result" id="dig-result">
+                    <div class="result-label">계산 결과</div>
+                    흑백 디지털 책자 조건을 입력한 뒤 [계산하기]를 눌러 주세요.
+                </div>
+            </div>
+        </section>
+
+        <!-- 대량 옵셋 패널 -->
+        <section id="panel-offset" class="panel">
+            <div class="card">
+                <h1>대량 옵셋 책자 계산기</h1>
+                <div class="panel-desc">
+                    국전/2절/4×6 전지 단가표와 판비·코팅비·제본비를 반영한 대량 옵셋 책자 계산입니다.
+                    (표지는 국2절/2절, 내지는 국전 16p 폼 기준)
+                </div>
+
+                <div class="offset-layout">
+                    <div class="offset-main">
+                        <!-- 1. 기본 정보 -->
+                        <div class="section">
+                            <div class="section-header">
+                                <div class="section-index">1</div>
+                                <div>
+                                    <div class="section-title">기본 정보</div>
+                                    <div class="section-sub">제본 방식, 사이즈, 내지 페이지, 부수를 설정합니다.</div>
+                                </div>
+                            </div>
+
+                            <div class="offset-row">
+                                <div class="offset-field">
+                                    <label>제본 방식</label>
+                                    <div class="radio-group">
+                                        <label>
+                                            <input type="radio" name="bindingType" value="perfect" checked>
+                                            무선제본
+                                        </label>
+                                        <label>
+                                            <input type="radio" name="bindingType" value="saddle">
+                                            중철제본
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="offset-field">
+                                    <label>사이즈</label>
+                                    <select id="bookSize">
+                                        <option value="A4">A4</option>
+                                        <option value="B5">B5</option>
+                                        <option value="A5">A5</option>
+                                    </select>
+                                    <div class="hint">현재는 모든 사이즈를 국전 16p = 1대 기준으로 계산</div>
+                                </div>
+                            </div>
+
+                            <div class="offset-row">
+                                <div class="offset-field">
+                                    <label>내지 페이지 수 (표지 제외)</label>
+                                    <input type="number" id="innerPages" min="0" step="2">
+                                    <div class="hint">표지는 아래 인쇄방식에 따라 2p/4p가 자동 추가됩니다.</div>
+                                </div>
+                                <div class="offset-field">
+                                    <label>부수</label>
+                                    <input type="number" id="copies" min="1">
+                                </div>
+                            </div>
+
+                            <div class="offset-row">
+                                <div class="offset-field">
+                                    <label>내지 색상</label>
+                                    <div class="radio-group">
+                                        <label><input type="radio" name="innerColor" value="color" checked> 칼라</label>
+                                        <label><input type="radio" name="innerColor" value="mono"> 흑백</label>
+                                    </div>
+                                </div>
+                                <div class="offset-field">
+                                    <label>표지 페이지 (자동)</label>
+                                    <div id="coverPagesInfo" class="hint">현재 표지 페이지: 4p (양면)</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. 표지 설정 -->
+                        <div class="section">
+                            <div class="section-header">
+                                <div class="section-index">2</div>
+                                <div>
+                                    <div class="section-title">표지 설정</div>
+                                    <div class="section-sub">국2절 또는 2절(46전지 절단) 기준, 돈땡 4판 기준으로 계산합니다.</div>
+                                </div>
+                            </div>
+
+                            <div class="offset-row">
+                                <div class="offset-field">
+                                    <label>표지 인쇄 방식</label>
+                                    <div class="radio-group">
+                                        <label><input type="radio" name="coverSide" value="single"> 단면 (2p)</label>
+                                        <label><input type="radio" name="coverSide" value="double" checked> 양면 (4p, 돈땡)</label>
+                                    </div>
+                                    <div class="hint">양면 선택 시 4판 8도 돈땡 기준</div>
+                                </div>
+                                <div class="offset-field">
+                                    <label>표지 판형</label>
+                                    <div class="radio-group">
+                                        <label><input type="radio" name="coverSizeType" value="kuk2" checked> 국2절 (국전 절단)</label>
+                                        <label><input type="radio" name="coverSizeType" value="two46"> 2절 (4×6 전지 절단)</label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="offset-row">
+                                <div class="offset-field">
+                                    <label>표지 용지 계열</label>
+                                    <select id="coverPaperGroup" onchange="updateGramOptions('cover')"></select>
+                                    <div class="hint">초기값: 스노우지 200g</div>
+                                </div>
+                                <div class="offset-field">
+                                    <label>표지 평량 (g)</label>
+                                    <select id="coverPaperGram"></select>
+                                </div>
+                            </div>
+
+                            <div class="offset-row">
+                                <div class="offset-field">
+                                    <label>표지 코팅</label>
+                                    <div class="radio-group">
+                                        <label><input type="radio" name="coverCoating" value="none" checked> 없음</label>
+                                        <label><input type="radio" name="coverCoating" value="yes"> 코팅 (전면)</label>
+                                    </div>
+                                    <div class="hint">500부 이하 45,000원 / 500부 초과 80,000원</div>
+                                </div>
+                                <div class="offset-field"></div>
+                            </div>
+                        </div>
+
+                        <!-- 3. 내지 설정 -->
+                        <div class="section">
+                            <div class="section-header">
+                                <div class="section-index">3</div>
+                                <div>
+                                    <div class="section-title">내지 설정</div>
+                                    <div class="section-sub">내지는 국전 16p 기준, 폼 단위로 계산합니다.</div>
+                                </div>
+                            </div>
+
+                            <div class="offset-row">
+                                <div class="offset-field">
+                                    <label>내지 용지 계열</label>
+                                    <select id="innerPaperGroup" onchange="updateGramOptions('inner')"></select>
+                                    <div class="hint">초기값: 스노우지 150g</div>
+                                </div>
+                                <div class="offset-field">
+                                    <label>내지 평량 (g)</label>
+                                    <select id="innerPaperGram"></select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. 판매가 설정 -->
+                        <div class="section">
+                            <div class="section-header">
+                                <div class="section-index">4</div>
+                                <div>
+                                    <div class="section-title">판매가 / 부가세</div>
+                                    <div class="section-sub">원가에 마진을 적용하고, 부가세 포함 여부를 선택합니다.</div>
+                                </div>
+                            </div>
+
+                            <div class="offset-row">
+                                <div class="offset-field">
+                                    <label>마진율 (%)</label>
+                                    <input type="number" id="marginRate" value="30" min="0" step="1">
+                                    <div class="hint">예: 30 → 원가 × 1.3 후 부가세 계산</div>
+                                </div>
+                                <div class="offset-field">
+                                    <label>부가세</label>
+                                    <div class="radio-group">
+                                        <label><input type="checkbox" id="includeVAT" checked> 부가세 10% 포함</label>
+                                    </div>
+                                    <div class="hint">체크 해제 시 공급가(부가세 제외)까지만 표시</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn-primary" type="button" onclick="calculateOffset()">대량 옵셋 책자 계산하기</button>
+
+                        <div id="offset-result">
+                            계산 결과가 여기에 표시됩니다.
+                        </div>
+                    </div>
+
+                    <aside class="offset-memo">
+                        <div class="offset-memo-title">옵셋 계산 메모</div>
+                        <p>• 국전 1연 = 500장 (A4 16p 기준 1대당 1장)</p>
+                        <p>• 국2절 / 2절은 원지 1연 절단 → 1연 1000장 기준으로 장당 단가 계산</p>
+                        <p>• 표지: 국2절 또는 2절, 돈땡 4판(칼라). 중철+동일지일 때는 표지 따로 인쇄 안 함.</p>
+                        <p>• 내지: 항상 국전용지, 16p를 1대(폼)으로 계산, 1대마다 여분 100장.</p>
+                        <p>• 판비: 국전 11,000원 / 2절·국2절 8,000원</p>
+                        <p>• 표지 코팅: 500부 이하 45,000원 / 500부 초과 80,000원</p>
+                        <p>• 판매가: 원가 → 마진율 → 부가세 10% 순서로 계산</p>
+                    </aside>
+                </div>
+            </div>
+        </section>
+
+    </main>
+</div>
+
+<script>
+    // ------------------------------
+    //  카테고리 전환
+    // ------------------------------
+    function setupCategoryNav(){
+        const items = document.querySelectorAll(".category-item");
+        items.forEach(item=>{
+            item.addEventListener("click", ()=>{
+                const target = item.dataset.panel;
+                items.forEach(i=>i.classList.remove("active"));
+                item.classList.add("active");
+
+                document.querySelectorAll(".panel").forEach(p=>{
+                    if (p.id === target) p.classList.add("active");
+                    else p.classList.remove("active");
+                });
+            });
+        });
+    }
+
+    // ------------------------------
+    //  종이 그룹 (gsm 리스트)
+    // ------------------------------
+    const paperGroups = {
+        "아트지":       ["100","120","150","180","200","250"],
+        "스노우지":     ["100","120","150","180","200","250"],
+        "백색모조":     ["80","100","120","150","180","220"],
+        "미색모조":     ["80","100"],
+        "하이플러스":   ["90"],
+        "백색플러스":   ["80","100"],
+        "미색플러스":   ["80","100"],
+        "아르떼":       ["105","130","160","190","210","230"]
+    };
+
+    // 464×315 A3 한 장당 종이값
+    const A3_PAPER_PRICES = {
+        "아트지100": 32,
+        "아트지120": 38,
+        "아트지150": 48,
+        "아트지180": 58,
+        "아트지200": 64,
+        "아트지250": 80,
+
+        "스노우지100": 32,
+        "스노우지120": 38,
+        "스노우지150": 48,
+        "스노우지180": 58,
+        "스노우지200": 64,
+        "스노우지250": 80,
+
+        "백색모조80": 26,
+        "백색모조100": 32,
+        "백색모조120": 38,
+        "백색모조150": 48,
+        "백색모조180": 57,
+        "백색모조220": 73,
+
+        "미색모조80": 27,
+        "미색모조100": 33,
+
+        "하이플러스90": 31,
+
+        "백색플러스80": 29,
+        "백색플러스100": 33,
+
+        "미색플러스80": 27,
+        "미색플러스100": 34,
+
+        "아르떼105": 60,
+        "아르떼130": 74,
+        "아르떼160": 91,
+        "아르떼190": 108,
+        "아르떼210": 120,
+        "아르떼230": 131
+    };
+
+    function getA3PaperPrice(key){
+        return A3_PAPER_PRICES[key] || 0;
+    }
+
+    // 인디고 클릭 단가 (A3 1장 기준)
+    const A3_CLICK_INDIGO = {
+        color: { "1": 100, "2": 200 },
+        mono:  { "1": 20,  "2": 40  }
+    };
+
+    // 흑백 디지털 내지 클릭 단가 (A3 1장 기준)
+    const A3_CLICK_DIGITAL_INNER = { "1": 10, "2": 20 };
+
+    // 제본비 (권당)
+    const BINDING_COST_PER_BOOK = {
+        staple: 200,   // 중철
+        perfect: 400   // 무선
+    };
+
+    // 코팅비 (권당)
+    const COATING_COST_PER_BOOK = 300;
+
+    // 박스 관련 (대략)
+    const SHIPPING_PER_BOX = 3500;
+    function getBookCopiesPerBox(bookSize){
+        if (!bookSize) return 10;
+        if (bookSize === "A4") return 10;
+        if (bookSize === "B5") return 15;
+        if (bookSize === "A5") return 20;
+        return 10;
+    }
+
+    // ------------------------------
+    //  종이 셀렉트 초기화 (인디고/흑백 공용)
+    //  ★ 초기값: 표지 스노우지 200g / 내지 스노우지 150g
+    // ------------------------------
+    function initPaperSelectors(panelPrefix){
+        const coverTypeSel = document.getElementById(panelPrefix + "-coverType");
+        const innerTypeSel = document.getElementById(panelPrefix + "-innerType");
+        const coverGramSel = document.getElementById(panelPrefix + "-coverGram");
+        const innerGramSel = document.getElementById(panelPrefix + "-innerGram");
+        if (!coverTypeSel || !innerTypeSel) return;
+
+        const types = Object.keys(paperGroups);
+
+        function fillTypes(sel){
+            sel.innerHTML = "";
+            types.forEach(t=>{
+                const opt = document.createElement("option");
+                opt.value = t;
+                opt.textContent = t;
+                sel.appendChild(opt);
+            });
+        }
+
+        fillTypes(coverTypeSel);
+        fillTypes(innerTypeSel);
+
+        function updateGram(which){
+            const typeSel = (which === "cover") ? coverTypeSel : innerTypeSel;
+            const gramSel = (which === "cover") ? coverGramSel : innerGramSel;
+            if (!typeSel || !gramSel) return;
+            const type = typeSel.value;
+            const grams = paperGroups[type] || [];
+            gramSel.innerHTML = "";
+            grams.forEach(g=>{
+                const opt = document.createElement("option");
+                opt.value = g;
+                opt.textContent = g + "g";
+                gramSel.appendChild(opt);
+            });
+        }
+
+        const DEFAULT_COVER_TYPE = "스노우지";
+        const DEFAULT_COVER_GRAM = "200";
+        const DEFAULT_INNER_TYPE = "스노우지";
+        const DEFAULT_INNER_GRAM = "150";
+
+        if (types.includes(DEFAULT_COVER_TYPE)){
+            coverTypeSel.value = DEFAULT_COVER_TYPE;
+        }
+        if (types.includes(DEFAULT_INNER_TYPE)){
+            innerTypeSel.value = DEFAULT_INNER_TYPE;
+        }
+
+        updateGram("cover");
+        updateGram("inner");
+
+        if (coverGramSel && Array.from(coverGramSel.options).some(o=>o.value === DEFAULT_COVER_GRAM)){
+            coverGramSel.value = DEFAULT_COVER_GRAM;
+        }
+        if (innerGramSel && Array.from(innerGramSel.options).some(o=>o.value === DEFAULT_INNER_GRAM)){
+            innerGramSel.value = DEFAULT_INNER_GRAM;
+        }
+
+        coverTypeSel.addEventListener("change", ()=>updateGram("cover"));
+        innerTypeSel.addEventListener("change", ()=>updateGram("inner"));
+    }
+
+    // ------------------------------
+    //  공통 책자 계산 로직 (인디고/흑백)
+    // ------------------------------
+    function computeBookCost(params){
+        const {
+            mode,              // "indigo" or "digital"
+            bindType,
+            bookSize,
+            innerPages,
+            qty,
+            coverPrint,        // "1" or "2"
+            coverColorCode,    // "color" or "mono"
+            innerPrint,        // "1" or "2"
+            innerColorCode,    // "color"/"mono" (indigo에서만 의미)
+            coatValue,         // "0" or "1"
+            coverPaperKey,
+            innerPaperKey,
+            marginRatePercent
+        } = params;
+
+        const Q = qty;
+        const coverPages = (coverPrint === "2") ? 4 : 2;
+
+        // 1) A3 장수 계산
+        const N_cover = Q;   // 권당 표지 A3 1장
+        let N_inner = 0;
+        if (innerPages > 0){
+            if (innerPrint === "2"){
+                N_inner = Math.ceil(Q * innerPages / 4);  // 양면: 4p/장
+            } else {
+                N_inner = Math.ceil(Q * innerPages / 2);  // 단면: 2p/장
+            }
+        }
+
+        // 2) 클릭비
+        const coverClickTable = A3_CLICK_INDIGO[coverColorCode] || A3_CLICK_INDIGO["color"];
+        const coverSheetPrice = coverClickTable[coverPrint] || 0;
+
+        let innerSheetPrice;
+        if (mode === "indigo"){
+            const innerTable = A3_CLICK_INDIGO[innerColorCode] || A3_CLICK_INDIGO["color"];
+            innerSheetPrice = innerTable[innerPrint] || 0;
+        } else {
+            innerSheetPrice = A3_CLICK_DIGITAL_INNER[innerPrint] || 0; // 항상 흑백 디지털
+        }
+
+        const totalInnerPrintCost = N_inner * innerSheetPrice;
+        const totalCoverPrintCost = N_cover * coverSheetPrice;
+        const totalPrintCost = totalInnerPrintCost + totalCoverPrintCost;
+        const printCostPerBook = totalPrintCost / Q;
+
+        // 3) 종이비 (A3 단가 × 장수)
+        const coverPaperPrice = getA3PaperPrice(coverPaperKey);
+        const innerPaperPrice = getA3PaperPrice(innerPaperKey);
+        const totalCoverPaperCost = coverPaperPrice * N_cover;
+        const totalInnerPaperCost = innerPaperPrice * N_inner;
+        const coverPaperCostPerBook = totalCoverPaperCost / Q;
+        const innerPaperCostPerBook = totalInnerPaperCost / Q;
+
+        // 4) 제본비 / 코팅비
+        const bindCostPerBook = BINDING_COST_PER_BOOK[bindType] || 0;
+        const coatingCostPerBook = (coatValue === "1") ? COATING_COST_PER_BOOK : 0;
+        const totalCoatingCost = coatingCostPerBook * Q;
+
+        const costPerBookRaw =
+            printCostPerBook +
+            innerPaperCostPerBook +
+            coverPaperCostPerBook +
+            bindCostPerBook +
+            coatingCostPerBook;
+
+        const totalCost = costPerBookRaw * Q;
+
+        // 5) 마진 적용 + 10원 단위 절삭
+        const marginMul = 1 + (marginRatePercent || 0) / 100;
+        const afterMargin = totalCost * marginMul;
+        const productPrice = Math.floor(afterMargin / 10) * 10; // 10원 단위 절삭
+        const pricePerBook = Math.round(productPrice / Q);
+
+        // 6) 박스 / 택배
+        const copiesPerBox = getBookCopiesPerBox(bookSize);
+        const boxCount = Math.max(1, Math.ceil(Q / copiesPerBox));
+        const shippingCost = boxCount * SHIPPING_PER_BOX;
+
+        return {
+            productPrice,
+            pricePerBook,
+            coverPages,
+            N_cover,
+            N_inner,
+            totalInnerPrintCost,
+            totalCoverPrintCost,
+            totalInnerPaperCost,
+            totalCoverPaperCost,
+            costPerBookRaw,
+            boxCount,
+            copiesPerBox,
+            shippingCost,
+            coatingCostPerBook,
+            totalCoatingCost
+        };
+    }
+
+    // ------------------------------
+    //  인디고 계산
+    // ------------------------------
+    function calculateIndigo(){
+        const bindType = document.querySelector("input[name='ind-bind']:checked")?.value || "perfect";
+        const bookSize = document.getElementById("ind-bookSize").value;
+        let innerPages = Number(document.getElementById("ind-innerPages").value) || 0;
+        const qty = Number(document.getElementById("ind-qty").value) || 0;
+
+        if (qty <= 0){
+            alert("부수를 1부 이상 입력해 주세요.");
+            return;
+        }
+        if (innerPages <= 0){
+            alert("내지 페이지 수를 입력해 주세요.");
+            return;
+        }
+
+        const coverPrint = document.querySelector("input[name='ind-coverPrint']:checked")?.value || "2";
+        const coverColorCode = document.querySelector("input[name='ind-coverColor']:checked")?.value || "color";
+        const innerPrint = document.querySelector("input[name='ind-innerPrint']:checked")?.value || "2";
+        const innerColorCode = document.querySelector("input[name='ind-innerColor']:checked")?.value || "color";
+        const coatValue = document.querySelector("input[name='ind-coat']:checked")?.value || "0";
+
+        const marginRate = Number(document.getElementById("ind-marginRate").value) || 0;
+        const vatOption = document.querySelector("input[name='ind-vat']:checked")?.value || "add";
+
+        const coverType = document.getElementById("ind-coverType").value;
+        const coverGram = document.getElementById("ind-coverGram").value;
+        const innerType = document.getElementById("ind-innerType").value;
+        const innerGram = document.getElementById("ind-innerGram").value;
+
+        const coverPaperKey = coverType + coverGram;
+        const innerPaperKey = innerType + innerGram;
+
+        const coverPages = (coverPrint === "2") ? 4 : 2;
+        let totalPages = innerPages + coverPages;
+
+        if (bindType === "perfect" && totalPages < 30){
+            const minInner = Math.max(0, 30 - coverPages);
+            alert(`무선 제본은 표지 포함 30p 이상이어야 합니다.\n내지 페이지를 ${minInner}p로 보정합니다.`);
+            innerPages = minInner;
+            document.getElementById("ind-innerPages").value = minInner;
+            totalPages = innerPages + coverPages;
+        }
+
+        const cost = computeBookCost({
+            mode: "indigo",
+            bindType,
+            bookSize,
+            innerPages,
+            qty,
+            coverPrint,
+            coverColorCode,
+            innerPrint,
+            innerColorCode,
+            coatValue,
+            coverPaperKey,
+            innerPaperKey,
+            marginRatePercent: marginRate
+        });
+
+        const VAT_RATE = 0.10;
+        let vatAmount = 0;
+        let finalPrice = cost.productPrice;
+        let vatText;
+        if (vatOption === "add"){
+            vatAmount = Math.round(cost.productPrice * VAT_RATE);
+            finalPrice += vatAmount;
+            vatText = `부가세 10% : ₩${vatAmount.toLocaleString()}\n`;
+        } else {
+            vatText = `※ 부가세 별도 (10% 미포함 금액입니다)\n`;
+        }
+
+        const bindingUnit = BINDING_COST_PER_BOOK[bindType] || 0;
+        const totalBinding = bindingUnit * qty;
+
+        const resultLines =
+            `📚 [기본 정보]\n` +
+            `제본 : ${bindType === "staple" ? "중철제본" : "무선제본"}\n` +
+            `사이즈 : ${bookSize}\n` +
+            `부수 : ${qty.toLocaleString()}부\n` +
+            `총 페이지 : 내지 ${innerPages}p + 표지 ${coverPages}p = ${innerPages + coverPages}p\n\n` +
+
+            `🧾 [비용 구성 (원가 기준)]\n` +
+            `표지 클릭비 합계 : ₩${cost.totalCoverPrintCost.toLocaleString()}\n` +
+            `내지 클릭비 합계 : ₩${cost.totalInnerPrintCost.toLocaleString()}\n` +
+            `표지 종이값 합계 : ₩${cost.totalCoverPaperCost.toLocaleString()}\n` +
+            `내지 종이값 합계 : ₩${cost.totalInnerPaperCost.toLocaleString()}\n` +
+            `제본비 합계(권당 ${bindingUnit}원) : ₩${totalBinding.toLocaleString()}\n` +
+            `코팅비 합계(권당 300원, 선택 시 원가에 포함) : ₩${cost.totalCoatingCost.toLocaleString()}\n\n` +
+
+            `💰 [단가 / 총액]\n` +
+            `권당 원가(마진 전, 대략) : 약 ₩${Math.round(cost.costPerBookRaw).toLocaleString()}\n` +
+            `권당 공급가(마진 ${marginRate}% 적용, 10원 절삭) : ₩${cost.pricePerBook.toLocaleString()}\n` +
+            `총 공급가(부가세 전, 배송비 제외) : ₩${cost.productPrice.toLocaleString()}\n` +
+            vatText +
+            `택배비 (상자 ${cost.boxCount}개 × 3,500원, 별도 청구) : 약 ₩${cost.shippingCost.toLocaleString()}\n` +
+            `상자당 예상 부수 : 약 ${cost.copiesPerBox}부\n` +
+            `────────────────────\n` +
+            `최종 결제금액 (부가세 ${vatOption === "add" ? "포함" : "별도"}, 배송비 제외)\n` +
+            `→ ₩${finalPrice.toLocaleString()}`;
+
+        document.getElementById("ind-result").textContent = resultLines;
+    }
+
+    // ------------------------------
+    //  흑백 디지털 계산
+    // ------------------------------
+    function calculateDigital(){
+        const bindType = document.querySelector("input[name='dig-bind']:checked")?.value || "perfect";
+        const bookSize = document.getElementById("dig-bookSize").value;
+        let innerPages = Number(document.getElementById("dig-innerPages").value) || 0;
+        const qty = Number(document.getElementById("dig-qty").value) || 0;
+
+        if (qty <= 0){
+            alert("부수를 1부 이상 입력해 주세요.");
+            return;
+        }
+        if (innerPages <= 0){
+            alert("내지 페이지 수를 입력해 주세요.");
+            return;
+        }
+
+        const coverPrint = document.querySelector("input[name='dig-coverPrint']:checked")?.value || "2";
+        const coverColorCode = document.querySelector("input[name='dig-coverColor']:checked")?.value || "color";
+        const innerPrint = document.querySelector("input[name='dig-innerPrint']:checked")?.value || "2";
+        const coatValue = document.querySelector("input[name='dig-coat']:checked")?.value || "0";
+
+        const marginRate = Number(document.getElementById("dig-marginRate").value) || 0;
+        const vatOption = document.querySelector("input[name='dig-vat']:checked")?.value || "add";
+
+        const coverType = document.getElementById("dig-coverType").value;
+        const coverGram = document.getElementById("dig-coverGram").value;
+        const innerType = document.getElementById("dig-innerType").value;
+        const innerGram = document.getElementById("dig-innerGram").value;
+
+        const coverPaperKey = coverType + coverGram;
+        const innerPaperKey = innerType + innerGram;
+
+        const coverPages = (coverPrint === "2") ? 4 : 2;
+        let totalPages = innerPages + coverPages;
+
+        if (bindType === "perfect" && totalPages < 30){
+            const minInner = Math.max(0, 30 - coverPages);
+            alert(`무선 제본은 표지 포함 30p 이상이어야 합니다.\n내지 페이지를 ${minInner}p로 보정합니다.`);
+            innerPages = minInner;
+            document.getElementById("dig-innerPages").value = minInner;
+            totalPages = innerPages + coverPages;
+        }
+
+        const cost = computeBookCost({
+            mode: "digital",
+            bindType,
+            bookSize,
+            innerPages,
+            qty,
+            coverPrint,
+            coverColorCode,
+            innerPrint,
+            innerColorCode: "mono",   // 무시됨
+            coatValue,
+            coverPaperKey,
+            innerPaperKey,
+            marginRatePercent: marginRate
+        });
+
+        const VAT_RATE = 0.10;
+        let vatAmount = 0;
+        let finalPrice = cost.productPrice;
+        let vatText;
+        if (vatOption === "add"){
+            vatAmount = Math.round(cost.productPrice * VAT_RATE);
+            finalPrice += vatAmount;
+            vatText = `부가세 10% : ₩${vatAmount.toLocaleString()}\n`;
+        } else {
+            vatText = `※ 부가세 별도 (10% 미포함 금액입니다)\n`;
+        }
+
+        const resultLines =
+            `📚 [기본 정보]\n` +
+            `제본 : ${bindType === "staple" ? "중철제본" : "무선제본"}\n` +
+            `사이즈 : ${bookSize}\n` +
+            `부수 : ${qty.toLocaleString()}부\n` +
+            `총 페이지 : 내지 ${innerPages}p + 표지 ${coverPages}p = ${innerPages + coverPages}p\n\n` +
+
+            `🖨 [출력 / 종이]\n` +
+            `표지 출력 : 인디고 (${coverColorCode === "color" ? "칼라" : "흑백"})\n` +
+            `내지 출력 : 흑백 디지털 (단면 10원 / 양면 20원)\n` +
+            `표지 A3 장수 : ${cost.N_cover.toLocaleString()}장\n` +
+            `내지 A3 장수 : ${cost.N_inner.toLocaleString()}장\n` +
+            `표지 종이비 합계 : ₩${cost.totalCoverPaperCost.toLocaleString()}\n` +
+            `내지 종이비 합계 : ₩${cost.totalInnerPaperCost.toLocaleString()}\n` +
+            `표지 출력비 합계 : ₩${cost.totalCoverPrintCost.toLocaleString()}\n` +
+            `내지 출력비 합계 : ₩${cost.totalInnerPrintCost.toLocaleString()}\n` +
+            `코팅비 합계(권당 300원, 선택 시 원가에 포함) : ₩${cost.totalCoatingCost.toLocaleString()}\n\n` +
+
+            `💰 [단가 / 총액]\n` +
+            `권당 원가(마진 전, 대략) : 약 ₩${Math.round(cost.costPerBookRaw).toLocaleString()}\n` +
+            `권당 공급가(마진 ${marginRate}% 적용, 10원 절삭) : ₩${cost.pricePerBook.toLocaleString()}\n` +
+            `총 공급가(부가세 전, 배송비 제외) : ₩${cost.productPrice.toLocaleString()}\n` +
+            vatText +
+            `택배비 (상자 ${cost.boxCount}개 × 3,500원, 별도 청구) : 약 ₩${cost.shippingCost.toLocaleString()}\n` +
+            `상자당 예상 부수 : 약 ${cost.copiesPerBox}부\n` +
+            `────────────────────\n` +
+            `최종 결제금액 (부가세 ${vatOption === "add" ? "포함" : "별도"}, 배송비 제외)\n` +
+            `→ ₩${finalPrice.toLocaleString()}`;
+
+        document.getElementById("dig-result").textContent = resultLines;
+    }
+
+    // ------------------------------
+    //  대량 옵셋용 데이터 / 함수
+    // ------------------------------
+    // 국전 1연 = 500장 기준
+    const kukPaperPrices = {
+        "모조지": {
+            "70": 46200,
+            "80": 50750,
+            "100": 62920,
+            "120": 75460,
+            "150": 94320,
+            "180": 113190,
+            "220": 144540
+        },
+        "미색모조지": {
+            "70": 47630,
+            "80": 52270,
+            "100": 64790
+        },
+        "플러스지백색": {
+            "80": 57270,
+            "100": 64790
+        },
+        "플러스지미색": {
+            "80": 53840,
+            "100": 66700
+        },
+        "하이플러스연미": {
+            "90": 61500
+        },
+        "아트지": {
+            "100": 62590,
+            "120": 75040,
+            "150": 95480,
+            "180": 114540,
+            "200": 127270,
+            "250": 159070,
+            "300": 190900
+        },
+        "스노우지": {
+            "100": 62590,
+            "120": 75040,
+            "150": 95480,
+            "180": 114540,
+            "200": 127270,
+            "250": 159070,
+            "300": 190900
+        },
+        "아르떼(N)": {
+            "90": 102200,
+            "105": 119200,
+            "130": 147600,
+            "160": 181600,
+            "190": 215600,
+            "210": 238700,
+            "230": 261000
+        }
+    };
+
+    // 4×6 전지 1연 = 500장 기준
+    const paper46Prices = {
+        "모조지": {
+            "70": 66550,
+            "80": 73060,
+            "100": 90530,
+            "120": 108620,
+            "150": 135780,
+            "180": 162920,
+            "220": 208070,
+            "260": 245880
+        },
+        "미색모조지": {
+            "70": 68530,
+            "80": 75250,
+            "100": 93280
+        },
+        "플러스지백색": {
+            "80": 75250,
+            "100": 93240
+        },
+        "플러스지미색": {
+            "80": 77510,
+            "100": 96030
+        },
+        "하이플러스연미": {
+            "90": 88550
+        },
+        "아트지": {
+            "100": 90040,
+            "120": 108030,
+            "150": 137400,
+            "180": 164890,
+            "200": 183190,
+            "250": 228980,
+            "300": 274820
+        },
+        "스노우지": {
+            "100": 90040,
+            "120": 108030,
+            "150": 137400,
+            "180": 164890,
+            "200": 183190,
+            "250": 228980,
+            "300": 274820
+        },
+        "아르떼(N)": {
+            "90": 147100,
+            "105": 171600,
+            "130": 212400,
+            "160": 261800,
+            "190": 310400,
+            "210": 343200,
+            "230": 376200
+        }
+    };
+
+    // 사이즈별 1대(폼) 기준 페이지 수
+    const formPagesBySize = {
+        "A4": 16,
+        "B5": 16,
+        "A5": 16
+    };
+
+    function getPrintUnitPrice(copies){
+        if (copies <= 500) return 8000;
+        if (copies <= 750) return 12000;
+        if (copies <= 1000) return 16000;
+        return 20000;
+    }
+
+    // A4 총장수 기준 제본비 (1연 = 4000장)
+    function calcBindingCost(totalPages, copies){
+        if (totalPages <= 0 || copies <= 0){
+            return { cost: 0, yeon: 0 };
+        }
+        const totalA4 = Math.ceil(totalPages / 2) * copies;
+        const yeon = Math.ceil(totalA4 / 4000);
+        let cost;
+        if (yeon <= 0){
+            cost = 0;
+        } else if (yeon < 6){
+            cost = 120000;
+        } else {
+            cost = 120000 + (yeon - 6) * 20000;
+        }
+        return { cost, yeon };
+    }
+
+    // 옵셋 용지 그램 선택 갱신
+    function updateGramOptions(target){
+        if (target === "cover"){
+            const groupSel = document.getElementById("coverPaperGroup");
+            const gramSel  = document.getElementById("coverPaperGram");
+            const group = groupSel.value;
+            const gramsSet = new Set();
+
+            if (kukPaperPrices[group]){
+                for (const g in kukPaperPrices[group]) gramsSet.add(g);
+            }
+            if (paper46Prices[group]){
+                for (const g in paper46Prices[group]) gramsSet.add(g);
+            }
+            const grams = Array.from(gramsSet).sort((a,b)=>parseInt(a)-parseInt(b));
+            gramSel.innerHTML = "";
+            grams.forEach(g=>{
+                const opt = document.createElement("option");
+                opt.value = g;
+                opt.textContent = g + "g";
+                gramSel.appendChild(opt);
+            });
+        } else {
+            const groupSel = document.getElementById("innerPaperGroup");
+            const gramSel  = document.getElementById("innerPaperGram");
+            const group = groupSel.value;
+            const grams = [];
+
+            if (kukPaperPrices[group]){
+                for (const g in kukPaperPrices[group]) grams.push(g);
+            }
+            grams.sort((a,b)=>parseInt(a)-parseInt(b));
+            gramSel.innerHTML = "";
+            grams.forEach(g=>{
+                const opt = document.createElement("option");
+                opt.value = g;
+                opt.textContent = g + "g";
+                gramSel.appendChild(opt);
+            });
+        }
+    }
+
+    function initPaperSelects(){
+        const coverGroupSel = document.getElementById("coverPaperGroup");
+        const innerGroupSel = document.getElementById("innerPaperGroup");
+        if (!coverGroupSel || !innerGroupSel) return;
+        coverGroupSel.innerHTML = "";
+        innerGroupSel.innerHTML = "";
+
+        const groups = Object.keys(kukPaperPrices);
+        groups.forEach(g=>{
+            const opt1 = document.createElement("option");
+            opt1.value = g;
+            opt1.textContent = g;
+            coverGroupSel.appendChild(opt1);
+
+            const opt2 = document.createElement("option");
+            opt2.value = g;
+            opt2.textContent = g;
+            innerGroupSel.appendChild(opt2);
+        });
+
+        const DEFAULT_GROUP = "스노우지";
+        const DEFAULT_COVER_GRAM = "200";
+        const DEFAULT_INNER_GRAM = "150";
+
+        if (groups.includes(DEFAULT_GROUP)){
+            coverGroupSel.value = DEFAULT_GROUP;
+            innerGroupSel.value = DEFAULT_GROUP;
+        }
+
+        updateGramOptions("cover");
+        updateGramOptions("inner");
+
+        const coverGramSel = document.getElementById("coverPaperGram");
+        const innerGramSel = document.getElementById("innerPaperGram");
+
+        if (coverGramSel && Array.from(coverGramSel.options).some(o=>o.value === DEFAULT_COVER_GRAM)){
+            coverGramSel.value = DEFAULT_COVER_GRAM;
+        }
+        if (innerGramSel && Array.from(innerGramSel.options).some(o=>o.value === DEFAULT_INNER_GRAM)){
+            innerGramSel.value = DEFAULT_INNER_GRAM;
+        }
+    }
+
+    // ★ 중철일 때 표지 용지를 내지와 자동 동기화
+    function setupOffsetSaddleSync(){
+        const perfectRadio = document.querySelector("input[name='bindingType'][value='perfect']");
+        const saddleRadio  = document.querySelector("input[name='bindingType'][value='saddle']");
+
+        const coverGroupSel = document.getElementById("coverPaperGroup");
+        const coverGramSel  = document.getElementById("coverPaperGram");
+        const innerGroupSel = document.getElementById("innerPaperGroup");
+        const innerGramSel  = document.getElementById("innerPaperGram");
+
+        if (!coverGroupSel || !coverGramSel || !innerGroupSel || !innerGramSel || !saddleRadio){
+            return;
+        }
+
+        function syncCoverToInner(){
+            if (!saddleRadio.checked) return;
+            coverGroupSel.value = innerGroupSel.value;
+            updateGramOptions("cover");
+            coverGramSel.value = innerGramSel.value;
+        }
+
+        saddleRadio.addEventListener("change", function(){
+            if (saddleRadio.checked){
+                syncCoverToInner();
+            }
+        });
+
+        if (perfectRadio){
+            perfectRadio.addEventListener("change", function(){
+            });
+        }
+
+        innerGroupSel.addEventListener("change", syncCoverToInner);
+        innerGramSel.addEventListener("change", syncCoverToInner);
+    }
+
+    // 표지 페이지 안내 텍스트 업데이트
+    function updateCoverPagesInfo(){
+        const coverSide = document.querySelector("input[name='coverSide']:checked")?.value || "double";
+        const coverPages = (coverSide === "double" ? 4 : 2);
+        const info = document.getElementById("coverPagesInfo");
+        if (info){
+            info.textContent = `현재 표지 페이지: ${coverPages}p (${coverSide === "double" ? "양면" : "단면"})`;
+        }
+    }
+
+    // 대량 옵셋 계산
+    function calculateOffset(){
+        const bindingType = document.querySelector("input[name='bindingType']:checked")?.value || "perfect";
+        const size        = document.getElementById("bookSize").value;
+        const innerPagesInput = parseInt(document.getElementById("innerPages").value, 10) || 0;
+        const copies      = parseInt(document.getElementById("copies").value, 10) || 0;
+
+        if (innerPagesInput < 0 || copies <= 0){
+            alert("내지 페이지 수와 부수를 올바르게 입력해 주세요.");
+            return;
+        }
+        if (innerPagesInput % 2 !== 0){
+            alert("내지 페이지는 2의 배수로 입력해 주세요.");
+            return;
+        }
+
+        const innerColor    = document.querySelector("input[name='innerColor']:checked")?.value || "color";
+        const coverSide     = document.querySelector("input[name='coverSide']:checked")?.value || "double";
+        const coverSizeType = document.querySelector("input[name='coverSizeType']:checked")?.value || "kuk2";
+        const coverCoating  = document.querySelector("input[name='coverCoating']:checked")?.value || "none";
+
+        const coverGroup  = document.getElementById("coverPaperGroup").value;
+        const coverGram   = document.getElementById("coverPaperGram").value;
+        const innerGroup  = document.getElementById("innerPaperGroup").value;
+        const innerGram   = document.getElementById("innerPaperGram").value;
+
+        const marginRate  = parseFloat(document.getElementById("marginRate").value) || 0;
+        const includeVAT  = document.getElementById("includeVAT").checked;
+
+        if (!coverGroup || !coverGram || !innerGroup || !innerGram){
+            alert("표지/내지 용지와 평량을 모두 선택해 주세요.");
+            return;
+        }
+
+        const isSaddle = (bindingType === "saddle");
+        const sameStock = (coverGroup === innerGroup && coverGram === innerGram);
+
+        const coverPages = (coverSide === "double" ? 4 : 2);
+        const innerPages = innerPagesInput;
+        const totalPagesBook = coverPages + innerPages;
+
+        const unitPrice = getPrintUnitPrice(copies);
+
+        // ----- 표지 계산 -----
+        let coverPaperCost = 0;
+        let coverPlateCost = 0;
+        let coverPrintCost = 0;
+        let coverCoatingCost = 0;
+        let coverText = "";
+
+        let coverMerged = false;
+        if (isSaddle && sameStock){
+            coverMerged = true;
+        }
+
+        if (coverCoating === "yes"){
+            if (copies <= 500){
+                coverCoatingCost = 45000;
+            } else {
+                coverCoatingCost = 80000;
+            }
+        }
+
+        if (!coverMerged){
+            const coversPerSheet = 2;
+            const sheetsForCopies = Math.ceil(copies / coversPerSheet);
+            const overSheetsCover = 100;
+            const totalCoverSheets = sheetsForCopies + overSheetsCover;
+
+            let perSheetCover = 0;
+            if (coverSizeType === "kuk2"){
+                const tbl = kukPaperPrices[coverGroup];
+                if (!tbl || !tbl[coverGram]){
+                    alert("선택한 표지 용지의 국전 단가가 없습니다.");
+                    return;
+                }
+                perSheetCover = tbl[coverGram] / 1000;
+            } else {
+                const tbl = paper46Prices[coverGroup];
+                if (!tbl || !tbl[coverGram]){
+                    alert("선택한 표지 용지의 4×6 전지 단가가 없습니다.");
+                    return;
+                }
+                perSheetCover = tbl[coverGram] / 1000;
+            }
+
+            coverPaperCost = Math.round(totalCoverSheets * perSheetCover);
+
+            const coverPlateCount = 4;
+            const plateUnitCover  = 8000;
+            coverPlateCost = coverPlateCount * plateUnitCover;
+
+            const sides = (coverSide === "double") ? 2 : 1;
+            coverPrintCost = coverPlateCount * sides * unitPrice;
+
+            coverText += "📕 [표지]\n";
+            coverText += `표지 페이지 : ${coverPages}p (${coverSide === "double" ? "양면" : "단면"})\n`;
+            coverText += `용지 : ${coverGroup} ${coverGram}g (${coverSizeType === "kuk2" ? "국2절(국전 절단)" : "2절(46절단)"})\n`;
+            coverText += `부수 : ${copies.toLocaleString()}부\n`;
+            coverText += `필요 장수 = ⌈${copies} / 2⌉ + 여분 100 = ${totalCoverSheets.toLocaleString()}장\n`;
+            coverText += `1장 단가 ≈ ${Math.round(perSheetCover).toLocaleString()}원\n`;
+            coverText += `용지비 ≈ ${coverPaperCost.toLocaleString()}원\n`;
+            coverText += `판수 = 4판 (CMYK)\n`;
+            coverText += `판비 = 4 × ${plateUnitCover.toLocaleString()}원 = ${coverPlateCost.toLocaleString()}원\n`;
+            coverText += `인쇄비 = 4판 × ${sides}면 × ${unitPrice.toLocaleString()}원 = ${coverPrintCost.toLocaleString()}원\n`;
+            if (coverCoating === "yes"){
+                coverText += `코팅비 = ${coverCoatingCost.toLocaleString()}원 (500부 이하 45,000 / 초과 80,000)\n\n`;
+            } else {
+                coverText += `코팅 없음\n\n`;
+            }
+        } else {
+            coverText += "📕 [표지]\n";
+            coverText += "중철 + 표지/내지 용지 동일 → 표지는 별도 인쇄 없이 내지 인쇄에 포함됩니다.\n";
+            if (coverCoating === "yes"){
+                coverText += `표지 코팅비 = ${coverCoatingCost.toLocaleString()}원 (500부 이하 45,000 / 초과 80,000)\n\n`;
+            } else {
+                coverText += "코팅 없음\n\n";
+            }
+        }
+
+        // ----- 내지 계산 -----
+        let innerPaperCost = 0;
+        let innerPlateCost = 0;
+        let innerPrintCost = 0;
+        let bindingCost = 0;
+        let bindingYeon = 0;
+        let innerText = "";
+
+        if (copies > 0){
+            const pagesForInnerPrint = innerPages + (coverMerged ? coverPages : 0);
+            if (pagesForInnerPrint > 0){
+                const formPages = formPagesBySize[size] || 16;
+                const forms = Math.ceil(pagesForInnerPrint / formPages);
+                const platesPerForm = (innerColor === "color") ? 8 : 2;
+                const totalPlates = forms * platesPerForm;
+                const plateUnitInner = 11000;
+                innerPlateCost = totalPlates * plateUnitInner;
+
+                innerPrintCost = totalPlates * unitPrice;
+
+                const overSheetsInner = 100;
+                const totalSheetsInner = forms * (copies + overSheetsInner);
+
+                const tblInner = kukPaperPrices[innerGroup];
+                if (!tblInner || !tblInner[innerGram]){
+                    alert("선택한 내지 용지의 국전 단가가 없습니다.");
+                    return;
+                }
+                const perSheetInner = tblInner[innerGram] / 500;
+                innerPaperCost = Math.round(totalSheetsInner * perSheetInner);
+
+                const bindInfo = calcBindingCost(totalPagesBook, copies);
+                bindingCost = bindInfo.cost;
+                bindingYeon = bindInfo.yeon;
+
+                innerText += "📄 [내지]\n";
+                innerText += `내지 페이지 : ${innerPages}p (표지 ${coverPages}p 별도)\n`;
+                if (coverMerged){
+                    innerText += `※ 중철 + 동일 용지 → 내지 인쇄 페이지에 표지 ${coverPages}p 포함\n`;
+                }
+                innerText += `인쇄 기준 페이지(폼 계산) = ${pagesForInnerPrint}p\n`;
+                innerText += `용지 : ${innerGroup} ${innerGram}g (국전)\n`;
+                innerText += `대수(${formPages}p 기준) = ⌈${pagesForInnerPrint} / ${formPages}⌉ = ${forms}대\n`;
+                innerText += `국전 인쇄장수 = ${forms}대 × (${copies.toLocaleString()}부 + 여분 ${overSheetsInner}장) = ${totalSheetsInner.toLocaleString()}장\n`;
+                innerText += `1장 단가 ≈ ${Math.round(perSheetInner).toLocaleString()}원\n`;
+                innerText += `용지비 ≈ ${innerPaperCost.toLocaleString()}원\n`;
+                innerText += `총 판수 = ${totalPlates}판 (대당 ${platesPerForm}판)\n`;
+                innerText += `판비 = ${totalPlates} × ${plateUnitInner.toLocaleString()}원 = ${innerPlateCost.toLocaleString()}원\n`;
+                innerText += `인쇄비 = ${totalPlates} × ${unitPrice.toLocaleString()}원 = ${innerPrintCost.toLocaleString()}원\n`;
+                innerText += `제본비 = ${bindingCost.toLocaleString()}원 (기준 ${bindingYeon}연)\n\n`;
+            } else {
+                innerText += "📄 [내지]\n";
+                innerText += "내지 인쇄 페이지가 0p로 설정되어 계산이 생략되었습니다.\n\n";
+            }
+        }
+
+        // ----- 원가 합계 + 마진 + 부가세 -----
+        const totalCost =
+            coverPaperCost + coverPlateCost + coverPrintCost + coverCoatingCost +
+            innerPaperCost + innerPlateCost + innerPrintCost +
+            bindingCost;
+
+        let sellExVAT = totalCost;
+        if (marginRate > 0){
+            sellExVAT = Math.round(totalCost * (1 + marginRate / 100));
+        }
+        let vatAmount = 0;
+        let sellIncVAT = sellExVAT;
+        if (includeVAT){
+            vatAmount = Math.round(sellExVAT * 0.1);
+            sellIncVAT = sellExVAT + vatAmount;
+        }
+
+        let baseText = "📚 [기본 정보]\n";
+        baseText += `제본 : ${bindingType === "perfect" ? "무선제본" : "중철제본"}\n`;
+        baseText += `사이즈 : ${size}\n`;
+        baseText += `표지 페이지 : ${coverPages}p\n`;
+        baseText += `내지 페이지 : ${innerPages}p\n`;
+        baseText += `총 페이지 : ${totalPagesBook}p\n`;
+        baseText += `부수 : ${copies.toLocaleString()}부\n`;
+        baseText += `내지 색상 : ${innerColor === "color" ? "칼라" : "흑백"}\n\n`;
+
+        let totalText = "────────────────────\n";
+        totalText += `원가 합계(표지 + 내지 + 제본 + 코팅) ≈ ${totalCost.toLocaleString()}원\n`;
+        if (marginRate > 0){
+            totalText += `마진율 ${marginRate.toFixed(1)}% 적용 공급가(부가세 제외) ≈ ${sellExVAT.toLocaleString()}원\n`;
+        } else {
+            totalText += `공급가(마진 미적용, 부가세 제외) ≈ ${sellExVAT.toLocaleString()}원\n`;
+        }
+        if (includeVAT){
+            totalText += `부가세 10% ≈ ${vatAmount.toLocaleString()}원\n`;
+            totalText += `최종 판매가(부가세 포함) ≈ ${sellIncVAT.toLocaleString()}원\n`;
+        } else {
+            totalText += `최종 판매가(부가세 미포함) ≈ ${sellExVAT.toLocaleString()}원\n`;
+        }
+        totalText += `※ 배송비는 별도 청구 (지역/무게에 따라 책정)\n`;
+
+        document.getElementById("offset-result").textContent =
+            baseText + coverText + innerText + totalText;
+    }
+
+    // ------------------------------
+    //  초기화
+    // ------------------------------
+    window.addEventListener("load", ()=>{
+        setupCategoryNav();
+
+        initPaperSelectors("ind");
+        initPaperSelectors("dig");
+
+        initPaperSelects();
+        setupOffsetSaddleSync();
+        updateCoverPagesInfo();
+
+        document.querySelectorAll("input[name='coverSide']").forEach(r=>{
+            r.addEventListener("change", updateCoverPagesInfo);
+        });
+    });
+</script>
+
+</body>
+</html>
