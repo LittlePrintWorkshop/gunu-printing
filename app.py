@@ -256,18 +256,18 @@ def payment_callback():
         
         print(f"🔍 결제 상태: state={state}, mul_no={mul_no}, order_id={order_id}, pay_type={pay_type}")
         
-        # 일단 PayApp에 성공 응답 (재시도 방지)
         # mul_no와 order_id가 있으면 저장 시도
         if mul_no and order_id:
             try:
                 # 주문 찾기
                 order = Order.query.filter_by(order_id=order_id).first()
                 if order:
-                    # mul_no, pay_type 저장
+                    # [Fix] mul_no, pay_type 저장 + 주문 상태 paid로 변경
                     order.mul_no = mul_no
                     order.pay_type = pay_type
+                    order.status = 'paid'  # [Fix] 결제 완료 상태로 변경
                     db.session.commit()
-                    print(f"✅ 주문 {order_id}에 mul_no={mul_no} 저장 완료")
+                    print(f"✅ 주문 {order_id}에 mul_no={mul_no}, status=paid 저장 완료")
                 else:
                     print(f"⚠️ 주문을 찾을 수 없음: {order_id} (나중에 업데이트될 수도 있음)")
             except Exception as e:
