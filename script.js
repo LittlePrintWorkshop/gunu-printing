@@ -3725,21 +3725,11 @@ async function startPaymentDirectOrder(totalAmount, user) {
 
   if (isLocalEnv) {
     toast('테스트 모드: 결제 없이 주문 완료 처리');
-    
-    // [Fix] 바로주문도 임시정보를 저장 후 서버로 보내기
-    const tempDirectOrderData = {
-      total_price: totalAmount,
-      delivery_info: {},
-      order_details: {}
-      // items는 바로주문이므로 없음
-    };
-    localStorage.setItem('tempDirectOrder', JSON.stringify(tempDirectOrderData));
-    
     await clearCartEverywhere();
-    // 테스트 모드는 바로 완료화면 표시
+    // [Fix] 테스트 모드도 객체 형식으로 전달
     showOrderComplete({
-      order_id: 'OLOCAL-' + Date.now(),
-      order_code: 'OLOCAL-' + Date.now(),
+      order_id: orderId,
+      order_code: orderId,
       total_price: totalAmount
     });
     return;
@@ -4652,30 +4642,55 @@ async function submitOrder() {
     orderDetails.shipping.cost = totalShipping;
   }
 
-  // [Fix] 임시 주문정보를 localStorage에 저장 (결제 완료 후 서버로 전송)
-  const tempOrderData = {
-    items: cart,
-    total_price: finalPrice,
-    delivery_info: deliveryInfo,
-    order_details: orderDetails,
-    user_id: user.user_id,
-    user_name: user.name,
-    user_phone: user.phone
-  };
-  
-  // localStorage에 임시 주문 저장
-  localStorage.setItem('tempCartOrder', JSON.stringify(tempOrderData));
-  console.log('[submitOrder] ✅ 임시 주문정보 저장 완료:', {
-    items: cart.length,
-    totalPrice: finalPrice
-  });
-  
-  // 결제 실행 (orderId 없음)
-  startPayment(finalPrice, user);
+  // [Fix] 결제 전에 먼저 주문을 서버에 생성 (상태: 미결제)
+  // 팝업 닫힘 시 monitorPaymentWindow가 mul_no 확인해서 완료화면 표시
+  try {
+    const response = await fetch('/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+      },
+      body: JSON.stringify({
+        items: cart,
+        total_price: finalPrice,
+        delivery_info: deliveryInfo,
+        order_details: orderDetails
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[submitOrder] 주문 생성 실패:', response.status, errorText);
+      alert(`주문 생성 실패 (${response.status}): ${errorText}`);
+      return;
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      console.error('[submitOrder] 주문 생성 실패:', result);
+      alert('주문 생성에 실패했습니다. 다시 시도해주세요.');
+      return;
+    }
+
+    const orderId = result.order_id;
+    console.log('[submitOrder] ✅ 주문 생성 완료:', {
+      orderId,
+      totalPrice: finalPrice,
+      itemCount: cart.length
+    });
+
+    // 결제 실행 (orderId 전달)
+    startPayment(finalPrice, user, orderId);
+  } catch (e) {
+    console.error('[submitOrder] 주문 생성 중 오류:', e);
+    alert('주문 생성 중 오류가 발생했습니다: ' + e.message);
+  }
 }
 
 // PayApp 결제 시작
-async function startPayment(totalAmount, user) {
+// [Fix] orderId 파라미터 추가: monitorPaymentWindow에서 mul_no 확인용
+async function startPayment(totalAmount, user, orderId) {
   // 로컬/사설망/테스트 플래그 시 실제 결제 생략
   const host = window.location.hostname || '';
   const params = new URLSearchParams(window.location.search);
@@ -4724,11 +4739,8 @@ async function startPayment(totalAmount, user) {
   const goodnames = cart.map(item => stripQtyFromName(item.name) || '인쇄 상품').join(', ');
   const displayGoodname = goodnames.length > 30 ? goodnames.substring(0, 30) + '...' : goodnames;
   
-  // [Fix] returnUrl에 order_complete=true 신호 추가 - 결제 완료 후 완료창 표시
+  // [Fix] returnUrl을 홈으로 설정 (실제 완료는 monitorPaymentWindow에서 mul_no 확인으로 처리)
   const returnUrl = window.location.origin + '/';
-  
-  console.log('[startPayment] 🔗 returnUrl 설정:', returnUrl);
-  console.log('[startPayment] PayApp.setParam 호출 예정 - returnurl 포함');
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
@@ -4739,13 +4751,19 @@ async function startPayment(totalAmount, user) {
     'redirectpay': '1',
     'returnurl': returnUrl,
     'feedbackurl': window.location.origin + '/api/payment-callback',
-    'var1': '', // [Fix] 결제 완료 후 주문 생성
+    'var1': orderId || '', // [Fix] 주문번호
     'var2': user.user_id, // 사용자 아이디
     'skip_cstpage': 'y' // 매출전표 페이지 이동 안함
   });
 
   // 결제중 상태 표시
   showPaymentProcessing();
+  
+  // [Fix] sessionStorage에 pendingOrderId 저장 (monitorPaymentWindow에서 mul_no 확인용)
+  if (orderId) {
+    sessionStorage.setItem('pendingOrderId', orderId);
+    console.log('[startPayment] 미결제 주문ID 저장:', orderId);
+  }
   
   // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
   const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
