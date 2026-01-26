@@ -3699,6 +3699,7 @@ async function startPaymentDirectOrder(totalAmount, user) {
     'redirectpay': '1',
     'returnurl': returnUrl,
     'feedbackurl': window.location.origin + '/api/payment-callback',
+    'callback': 'onPaymentComplete',  // [Fix] PayApp 콜백 함수 이름 명시적으로 등록
     'var1': '', // [Fix] 결제 완료 후 주문 생성하므로 여기서는 비움
     'var2': user.user_id, // 사용자 아이디
     'skip_cstpage': 'y' // 매출전표 페이지 이동 안함
@@ -4579,6 +4580,7 @@ async function startPayment(totalAmount, user) {
     'redirectpay': '1',
     'returnurl': returnUrl,
     'feedbackurl': window.location.origin + '/api/payment-callback',
+    'callback': 'onPaymentComplete',  // [Fix] PayApp 콜백 함수 이름 명시적으로 등록
     'var1': '', // [Fix] 결제 완료 후 주문 생성하므로 여기서는 비움 (order_id는 onPaymentComplete에서 생성)
     'var2': user.user_id, // 사용자 아이디
     'skip_cstpage': 'y' // 매출전표 페이지 이동 안함
