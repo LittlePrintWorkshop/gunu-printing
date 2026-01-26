@@ -109,6 +109,8 @@ class Order(db.Model):
             'delivery_info': json.loads(self.delivery_info) if self.delivery_info else {},
             'order_details': json.loads(self.order_details) if self.order_details else {},
             'status': self.status,
+            'mul_no': self.mul_no,  # [Fix] PayApp 거래번호 - GET 응답에 포함하여 결제상태 확인 가능
+            'pay_type': self.pay_type,  # [Fix] 결제타입 포함
             'created_at': to_utc_iso(self.created_at)
         }
 
