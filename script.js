@@ -76,16 +76,9 @@ async function checkPaymentComplete() {
     return;
   }
 
-  // [Fix] 호환성: 이전 방식의 임시 주문 정보
-  const tempOrder = localStorage.getItem('tempOrder');
-  
-  console.log('tempOrder:', tempOrder);
-  
-  if (tempOrder) {
-    const orderData = JSON.parse(tempOrder);
-    console.log('장바구니 주문 처리 시작');
-    await saveOrderToServer(orderData, orderData.total_price);
-  }
+  // [Fix] tempOrder는 "결제 대기 중" 상태이므로 결제 신호 없이는 처리하면 안 됨
+  // 이 함수는 PayApp 돌아올 때만 호출되어야 하는데,
+  // 단순 페이지 로드에서 tempOrder를 자동 처리하면 결제 없이 중복 주문 생성됨
 }
 
 // 팝업 창에서 보내는 메시지 받기
