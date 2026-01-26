@@ -3611,16 +3611,25 @@ function monitorPaymentWindow(payappWindow) {
             console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', pendingOrderId);
             try {
               const token = getToken();
+              console.log('[monitorPaymentWindow] 토큰:', token ? 'O' : 'X');
+              console.log('[monitorPaymentWindow] 삭제 요청 시작...');
+              
               const deleteRes = await fetch(`/api/orders/${pendingOrderId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
               });
+              
+              console.log('[monitorPaymentWindow] 응답 상태:', deleteRes.status);
               const deleteData = await deleteRes.json();
-              if (deleteData.success) {
-                console.log('[monitorPaymentWindow] 주문 삭제 완료');
+              console.log('[monitorPaymentWindow] 응답 데이터:', deleteData);
+              
+              if (deleteRes.ok && deleteData.success) {
+                console.log('[monitorPaymentWindow] ✅ 주문 삭제 완료');
+              } else {
+                console.error('[monitorPaymentWindow] ❌ 주문 삭제 실패:', deleteRes.status, deleteData.message);
               }
             } catch (e) {
-              console.error('[monitorPaymentWindow] 주문 삭제 실패:', e);
+              console.error('[monitorPaymentWindow] 🔴 주문 삭제 오류:', e);
             }
             sessionStorage.removeItem('pendingOrderId');
             sessionStorage.removeItem('pendingPaymentLinkOrderId');
