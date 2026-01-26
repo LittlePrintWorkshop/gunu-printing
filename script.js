@@ -3626,17 +3626,26 @@ function monitorPaymentWindow(payappWindow) {
             const checkRes = await fetch(`/api/orders/${deleteOrderId}`, {
               headers: { 'Authorization': `Bearer ${token}` }
             });
+            
+            console.log('[monitorPaymentWindow] GET 응답 상태:', checkRes.status);
+            
             if (checkRes.ok) {
               const checkData = await checkRes.json();
-              if (checkData.success && checkData.order && checkData.order.mul_no) {
+              console.log('[monitorPaymentWindow] GET 응답 데이터:', JSON.stringify(checkData));
+              
+              // ✅ 응답 구조 확인 (order 객체 또는 직접 mul_no)
+              const order = checkData.order || checkData;
+              if (order && order.mul_no) {
                 orderHasMulNo = true;
-                console.log('[monitorPaymentWindow] ✅ 서버에서 확인: mul_no 있음 -', checkData.order.mul_no);
+                console.log('[monitorPaymentWindow] ✅ 서버 확인: mul_no 있음 -', order.mul_no);
               } else {
-                console.log('[monitorPaymentWindow] 서버에서 확인: mul_no 없음');
+                console.log('[monitorPaymentWindow] 서버 확인: mul_no 없음');
               }
+            } else {
+              console.log('[monitorPaymentWindow] GET 요청 실패 (상태:', checkRes.status + ')');
             }
           } catch (e) {
-            console.log('[monitorPaymentWindow] 서버 조회 오류 (진행):', e.message);
+            console.log('[monitorPaymentWindow] GET 조회 오류:', e.message);
           }
         }
         
