@@ -307,20 +307,20 @@ def payment_complete_close():
     <title>결제 완료</title>
     <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzI1NjNlYiIvPjx0ZXh0IHg9IjI1NiIgeT0iMzgwIiBmb250LXNpemU9IjI4MCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPkc8L3RleHQ+PC9zdmc+" type="image/svg+xml">
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; text-align: center; }
-        p { color: #333; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; text-align: center; background: #f0f0f0; }
+        p { color: #333; font-size: 16px; }
     </style>
 </head>
 <body>
-    <p>결제가 완료되었습니다. 잠시만 기다려주세요...</p>
+    <p>✅ 결제가 완료되었습니다.</p>
+    <p style="font-size: 12px; color: #666;">창을 닫는 중입니다...</p>
     <script>
         console.log('[payment_complete_close] 페이지 로드됨');
         
-        // 팝업이 opener(부모 창)의 제어를 받을 수 있는지 확인
+        // 부모 창에 신호 전송
         if (window.opener) {
             console.log('[payment_complete_close] opener 감지됨 - 부모 창에 신호 전송');
             try {
-                // 부모 창에 완료 신호 전송
                 window.opener.postMessage({
                     type: 'payment_completed_from_payapp',
                     message: 'PayApp에서 결제 완료됨'
@@ -329,23 +329,33 @@ def payment_complete_close():
             } catch (e) {
                 console.error('[payment_complete_close] 신호 전송 실패:', e);
             }
-            
-            // 팝업 자동 닫기 시도 (여러 번 시도)
-            const closeAttempts = [300, 800, 1200, 1600];
-            closeAttempts.forEach((delay, index) => {
-                setTimeout(() => {
-                    if (!window.closed) {
-                        console.log(`[payment_complete_close] 팝업 닫기 시도 ${index + 1}/4 (${delay}ms)`);
-                        window.close();
-                    }
-                }, delay);
-            });
-        } else {
-            console.log('[payment_complete_close] opener 없음 - 일반 페이지로 이동');
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 1000);
         }
+        
+        // 즉시 팝업 닫기 (여러 방법 동시에 시도)
+        function closeWindow() {
+            try {
+                window.close();
+            } catch (e) {
+                console.log('[payment_complete_close] window.close() 실패:', e);
+            }
+        }
+        
+        // 최대한 빨리 닫기
+        closeWindow();
+        
+        // 혹시 닫지 못했을 경우 반복 시도
+        setTimeout(closeWindow, 100);
+        setTimeout(closeWindow, 200);
+        setTimeout(closeWindow, 500);
+        setTimeout(closeWindow, 1000);
+        
+        // 마지막 수단: 홈페이지로 리다이렉트 (닫기 실패 시)
+        setTimeout(() => {
+            if (!window.closed) {
+                console.log('[payment_complete_close] 창 닫기 실패 - 홈페이지로 이동');
+                window.location.href = '/';
+            }
+        }, 2000);
     </script>
 </body>
 </html>'''
@@ -359,7 +369,7 @@ def static_files(path):
         return '', 404
     
     # [Fix] 특정 라우트는 처리하지 않음 (Flask가 처리하도록)
-    if path in ['login', 'signup']:
+    if path in ['login', 'signup', 'payment-complete-close']:
         return '', 404
     
     # JavaScript 파일의 MIME type을 명시적으로 설정
