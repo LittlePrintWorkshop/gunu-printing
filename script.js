@@ -3590,7 +3590,7 @@ function monitorPaymentWindow(payappWindow) {
   let isClosed = false;
   
   // 매 500ms마다 팝업 상태 확인
-  const checkInterval = setInterval(() => {
+  const checkInterval = setInterval(async () => {
     try {
       if (payappWindow.closed && !isClosed) {
         isClosed = true;
@@ -3600,9 +3600,30 @@ function monitorPaymentWindow(payappWindow) {
         // 결제가 실제로 완료되었는지 확인 (mul_no가 저장되었는지)
         const tempOrder = JSON.parse(localStorage.getItem('tempOrder') || '{}');
         if (!tempOrder.mul_no) {
-          // 결제 완료 없이 팝업만 닫힘
+          // 결제 완료 없이 팝업만 닫힘 → 주문 삭제
           console.log('[monitorPaymentWindow] 결제 미완료 - 팝업만 닫힘');
           hidePaymentProcessing();
+          
+          // 임시 저장된 주문ID 확인
+          const pendingOrderId = sessionStorage.getItem('pendingPaymentLinkOrderId');
+          if (pendingOrderId) {
+            console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', pendingOrderId);
+            try {
+              const token = getToken();
+              const deleteRes = await fetch(`/api/orders/${pendingOrderId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              const deleteData = await deleteRes.json();
+              if (deleteData.success) {
+                console.log('[monitorPaymentWindow] 주문 삭제 완료');
+              }
+            } catch (e) {
+              console.error('[monitorPaymentWindow] 주문 삭제 실패:', e);
+            }
+            sessionStorage.removeItem('pendingPaymentLinkOrderId');
+          }
+          
           alert('결제가 취소되었습니다.');
         }
       }

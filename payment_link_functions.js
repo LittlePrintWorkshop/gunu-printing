@@ -562,6 +562,10 @@ async function processPaymentLink(linkCode) {
         return;
       }
       createdOrderId = createData.order_id;
+      
+      // 결제 취소 시 삭제할 수 있도록 임시 저장
+      console.log('[processPaymentLink] 생성된 주문ID:', createdOrderId);
+      sessionStorage.setItem('pendingPaymentLinkOrderId', createdOrderId);
     } catch (e) {
       console.error('주문 생성 오류:', e);
       alert('주문 생성 중 오류가 발생했습니다.');
@@ -626,6 +630,10 @@ async function handlePaymentLinkComplete(payCode, orderId) {
   console.log('[handlePaymentLinkComplete] 시작:', { payCode, orderId });
   
   try {
+    // 결제 완료 → 임시저장된 ID 제거
+    sessionStorage.removeItem('pendingPaymentLinkOrderId');
+    console.log('[handlePaymentLinkComplete] 임시 주문ID 제거 완료');
+    
     // 로그인 토큰 확인
     const token = getToken();
     if (!token) {
