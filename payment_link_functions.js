@@ -108,6 +108,15 @@ async function createPaymentLink() {
     return;
   }
 
+  let specs = null;
+
+  if (productType === 'book') {
+    const coverPaper = get('pay-link-cover-paper')?.value?.trim();
+    const innerPaper = get('pay-link-inner-paper')?.value?.trim();
+    const totalPages = get('pay-link-total-pages')?.value?.trim();
+    const binding = get('pay-link-binding')?.value;
+    const printQty = get('pay-link-print-qty')?.value?.trim();
+
     if (!coverPaper || !innerPaper || !totalPages || !binding || !printQty) {
       alert('책 사양을 모두 입력해주세요.');
       return;

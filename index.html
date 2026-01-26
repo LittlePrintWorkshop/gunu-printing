@@ -2189,10 +2189,6 @@ async function handlePaymentLinkComplete(payCode, orderId) {
     goHome();
   }
 }
-    alert('결제는 완료되었으나 처리 중 오류가 발생했습니다.');
-    goHome();
-  }
-}
 
 // 주문완료 팝업 표시 (확인 버튼 클릭 시 주문내역으로 이동)
 function showOrderCompleteWithNavigation(orderId, orderCode, totalPrice) {
