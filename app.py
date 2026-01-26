@@ -361,16 +361,6 @@ def payment_complete_close():
 </html>'''
     
     return html
-            if (!window.closed) {
-                console.log('[payment_complete_close] 창 닫기 실패 - 홈페이지로 이동');
-                window.location.href = '/';
-            }
-        }, 2000);
-    </script>
-</body>
-</html>'''
-    
-    return html
 
 @app.route('/<path:path>', methods=['GET', 'POST', 'HEAD', 'OPTIONS'])
 def static_files(path):
