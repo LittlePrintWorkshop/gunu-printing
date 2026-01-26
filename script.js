@@ -3692,27 +3692,44 @@ function monitorPaymentWindow(payappWindow) {
             }
             
             const orderData = await statusRes.json();
-            console.log('[monitorPaymentWindow] 서버 주문 상태:', orderData.status, '| mul_no:', orderData.mul_no);
+            console.log('[monitorPaymentWindow] 서버 응답:', orderData);
+            
+            // [Fix] 응답 구조: { success: true, order: {...} }
+            const order = orderData.order;
+            if (!order) {
+              console.error('[monitorPaymentWindow] 주문 데이터 없음');
+              hidePaymentProcessing();
+              alert('주문 정보를 찾을 수 없습니다.');
+              sessionStorage.removeItem('pendingOrderId');
+              sessionStorage.removeItem('pendingPaymentLinkOrderId');
+              return;
+            }
+            
+            console.log('[monitorPaymentWindow] 서버 주문 상태:', order.status, '| mul_no:', order.mul_no);
             
             // 2단계: 상태에 따라 처리
-            if (orderData.status === 'completed') {
+            if (order.status === 'completed') {
               // 이미 결제 완료됨 - 모래시계를 ✅로 변경
               console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제 완료됨');
               
-              // [Fix] 팝업이 아직 열려있으면 닫기
+              // [Fix] 팝업 강제 종료 시도 (여러 방법 시도)
               try {
                 if (payappWindow && !payappWindow.closed) {
-                  console.log('[monitorPaymentWindow] 팝업 닫는 중...');
+                  console.log('[monitorPaymentWindow] 팝업 강제 종료 시도 중...');
                   payappWindow.close();
+                  console.log('[monitorPaymentWindow] ✅ 팝업 종료 완료');
                 }
               } catch (e) {
-                console.log('[monitorPaymentWindow] 팝업 닫기 시도:', e.message);
+                console.log('[monitorPaymentWindow] 팝업 종료 시도 (크로스 도메인):', e.message);
               }
+              
+              // returnUrl로 리다이렉트하도록 신호 전송 (이미 PayApp이 처리할 것)
+              console.log('[monitorPaymentWindow] PayApp 자동 리다이렉트 대기 중...');
               
               // 모래시계 → ✅로 변경
               updatePaymentProcessingMessage(
                 '✅ 결제가 완료되었습니다!',
-                `주문번호: ${orderData.order_code || orderData.order_id}`,
+                `주문번호: ${order.order_code || order.order_id}`,
                 true  // isComplete = true
               );
               
@@ -3721,7 +3738,7 @@ function monitorPaymentWindow(payappWindow) {
                 hidePaymentProcessing();
                 goHome();
               }, 2000);
-            } else if (orderData.status === 'pending') {
+            } else if (order.status === 'pending') {
               // 아직 미결제 - 취소 신호 전송
               console.log('[monitorPaymentWindow] 주문이 pending 상태 - 취소 신호 전송');
               
@@ -3744,9 +3761,9 @@ function monitorPaymentWindow(payappWindow) {
               }
             } else {
               // 다른 상태 (cancelled 등)
-              console.log('[monitorPaymentWindow] 주문 상태:', orderData.status);
+              console.log('[monitorPaymentWindow] 주문 상태:', order.status);
               hidePaymentProcessing();
-              alert('주문 처리 상태: ' + orderData.status);
+              alert('주문 처리 상태: ' + order.status);
             }
           } catch (e) {
             console.error('[monitorPaymentWindow] 상태 확인 중 오류:', e);
@@ -3858,7 +3875,9 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   }
   
   // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
-  const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
+  // [Fix] 팝업 자동 종료를 위해 표준 크기 사용
+  const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=800,toolbar=no,location=no,status=no,menubar=no');
+  console.log('[startPaymentDirectOrder] PayApp 팝업 열기 완료');
   console.log('[startPaymentDirectOrder] PayApp.setTarget 및 payrequest 호출 중...');
   PayApp.setTarget('PayAppWindow');
   PayApp.payrequest();
@@ -4835,8 +4854,10 @@ async function startPayment(totalAmount, user, orderId) {
     console.log('[startPayment] 미결제 주문ID 저장:', orderId);
   }
   
-  // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
-  const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
+  // 팝업 창에서 결제 (너비 600px, 높이 800px - 팝업 자동 종료 최적화)
+  // [Fix] 팝업 자동 종료를 위해 표준 크기 사용
+  const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=800,toolbar=no,location=no,status=no,menubar=no');
+  console.log('[startPayment] PayApp 팝업 열기 완료');
   console.log('[startPayment] PayApp.setTarget 및 payrequest 호출 중...');
   PayApp.setTarget('PayAppWindow');
   PayApp.payrequest();
