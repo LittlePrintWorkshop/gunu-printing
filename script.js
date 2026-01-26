@@ -2472,7 +2472,16 @@ function displayOrderDetailModal(order) {
         console.log(`아이템 ${idx + 1} options:`, item.options);
         
         const opts = item.options || {};
-        const qtyText = opts.qty ? (typeof opts.qty === 'string' && /부\s*$/.test(opts.qty) ? opts.qty : `${opts.qty}부`) : '';
+        const qtyText = (() => {
+          if (!opts.qty) return '';
+          const qtyStr = String(opts.qty).trim();
+          // 괄호 제거, 중복 단위 제거 (권권, 부부, 권부, 부권 등)
+          const cleaned = qtyStr.replace(/[()]/g, '').replace(/권권|부부|권부|부권/g, '').trim();
+          // 이미 한글 단위가 있으면 그대로, 없으면 부 추가
+          if (/[가-힣]$/.test(cleaned)) return cleaned;
+          const numMatch = cleaned.match(/^(\d+)/);
+          return numMatch ? `${numMatch[1]}부` : cleaned;
+        })();
         
         itemsDetail += `
           <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
@@ -3287,6 +3296,13 @@ async function addToCartFromQuote() {
     date: new Date().toLocaleString()
   });
 
+  console.log('[addToCartFromQuote] 장바구니 추가 - qty 데이터 형식:', {
+    qtyVariable: qty,
+    qtyType: typeof qty,
+    qtyInCart: cart[cart.length - 1].qty,
+    fullItem: cart[cart.length - 1]
+  });
+
   localStorage.setItem(CART_KEY, JSON.stringify(cart));
   updateCartBadge();
   await syncCartToServer(cart);
@@ -3474,6 +3490,7 @@ async function orderDirectlyFromQuote() {
       order_code: orderId,
       total_price: finalPrice
     });
+    window._ordering = false;
     return;
   }
 
@@ -3495,45 +3512,33 @@ async function orderDirectlyFromQuote() {
     date: new Date().toLocaleString()
   };
 
-  try {
-    console.log('[파이프 검증] orderDirectlyFromQuote - API 전송 데이터:', {
-      finalPrice: finalPrice,
-      order_details: orderDetails
-    });
-    
-    const response = await fetch('/api/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
-      },
-      body: JSON.stringify({
-        items: [orderItem],
-        total_price: finalPrice,
-        delivery_info: {
-          recipient: user.name,
-          phone: user.phone,
-          address: user.addr || '',
-          requirements: ''
-        },
-        order_details: orderDetails
-      })
-    });
-    const result = await response.json();
-    if (!result.success) {
-      alert('주문 생성에 실패했습니다. 다시 시도해주세요.');
-      return;
-    }
-    const orderId = result.order_id;
-    localStorage.setItem('lastOrderId', orderId);
-    // 결제 실행 (주문번호 포함 복귀)
-    startPaymentDirectOrder(finalPrice, user, orderId);
-  } catch (e) {
-    console.error('주문 생성 오류:', e);
-    alert('주문 생성 중 오류가 발생했습니다.');
-  } finally {
-    window._ordering = false;
-  }
+  // [Fix] 결제 완료 후에만 주문을 최종 생성하도록 변경
+  // 임시 주문 데이터를 localStorage에 저장 (결제 완료 후 서버에 전송)
+  const tempDirectOrderData = {
+    items: [orderItem],
+    total_price: finalPrice,
+    delivery_info: {
+      recipient: user.name,
+      phone: user.phone,
+      address: user.addr || '',
+      requirements: ''
+    },
+    order_details: orderDetails,
+    created_at: new Date().toISOString()
+  };
+  localStorage.setItem('tempDirectOrder', JSON.stringify(tempDirectOrderData));
+  
+  console.log('[orderDirectlyFromQuote] 카테고리 직주문 - qty 데이터 형식:', {
+    qtyVariable: qty,
+    qtyType: typeof qty,
+    qtyInOrder: orderItem.qty,
+    fullItem: orderItem
+  });
+  console.log('[orderDirectlyFromQuote] 임시 직주문 데이터 저장:', tempDirectOrderData);
+
+  // 결제 실행 (주문번호 없음 - 결제 완료 후 생성)
+  startPaymentDirectOrder(finalPrice, user);
+  window._ordering = false;
 }
 
 // 결제중 상태 표시
@@ -3635,7 +3640,7 @@ function monitorPaymentWindow(payappWindow) {
 }
 
 // 견적에서 바로주문 결제
-async function startPaymentDirectOrder(totalAmount, user, orderId) {
+async function startPaymentDirectOrder(totalAmount, user) {
   const host = window.location.hostname || '';
   const params = new URLSearchParams(window.location.search);
   const isLocalEnv = host === 'localhost'
@@ -3653,8 +3658,8 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
     await clearCartEverywhere();
     // [Fix] 테스트 모드도 객체 형식으로 전달
     showOrderComplete({
-      order_id: orderId,
-      order_code: orderId,
+      order_id: 'OLOCAL-' + Date.now(),
+      order_code: 'OLOCAL-' + Date.now(),
       total_price: totalAmount
     });
     return;
@@ -3687,7 +3692,6 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
-    'goodname': '직주문',
     'price': totalAmount.toString(),
     'recvphone': user.phone || '01000000000',
     'memo': `고객: ${user.name}`,
@@ -3695,7 +3699,7 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
     'redirectpay': '1',
     'returnurl': returnUrl,
     'feedbackurl': window.location.origin + '/api/payment-callback',
-    'var1': orderId || '', // 주문번호
+    'var1': '', // [Fix] 결제 완료 후 주문 생성하므로 여기서는 비움
     'var2': user.user_id, // 사용자 아이디
     'skip_cstpage': 'y' // 매출전표 페이지 이동 안함
   });
@@ -3703,14 +3707,9 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   // 결제중 상태 표시
   showPaymentProcessing();
   
-  // 결제 취소 시 삭제할 수 있도록 임시 저장 (일반 주문)
-  if (orderId) {
-    sessionStorage.setItem('pendingOrderId', orderId);
-    console.log('[startPaymentDirectOrder] 생성된 주문ID 저장:', orderId);
-  }
+  // [Fix] orderId 제거 - 결제 완료 후에만 주문 생성되므로 sessionStorage 저장 불필요
   
   // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
-  // 미리 팝업을 열고 PayApp이 그 안에 결제 페이지를 로드하도록 함
   const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
   console.log('[startPaymentDirectOrder] PayApp.setTarget 및 payrequest 호출 중...');
   PayApp.setTarget('PayAppWindow');
@@ -4629,14 +4628,21 @@ async function onPaymentComplete(paymentResult) {
   }
   console.log('[onPaymentComplete] ✅ tempOrder에 mul_no 저장:', paymentResult.mul_no);
 
-  // 임시 주문 정보 가져오기 (결제링크용 + 일반주문용 둘다 확인)
+  // 임시 주문 정보 가져오기 (결제링크용 + 일반주문용 + 직주문용 모두 확인)
   let tempOrderForAPI = JSON.parse(localStorage.getItem('tempOrder') || '{}');
-  if (!tempOrderForAPI.order_id) {
+  if (!tempOrderForAPI.items || tempOrderForAPI.items.length === 0) {
     // 결제링크에서 온 경우
     const paymentLinkOrder = JSON.parse(localStorage.getItem('tempPaymentLinkOrder') || '{}');
-    if (paymentLinkOrder.order_id) {
+    if (paymentLinkOrder.items && paymentLinkOrder.items.length > 0) {
       tempOrderForAPI = paymentLinkOrder;
       console.log('[onPaymentComplete] 결제링크 주문 데이터 사용:', tempOrderForAPI);
+    } else {
+      // 카테고리에서 바로주문한 경우
+      const directOrder = JSON.parse(localStorage.getItem('tempDirectOrder') || '{}');
+      if (directOrder.items && directOrder.items.length > 0) {
+        tempOrderForAPI = directOrder;
+        console.log('[onPaymentComplete] 카테고리 직주문 데이터 사용:', tempOrderForAPI);
+      }
     }
   }
   
@@ -4691,6 +4697,7 @@ async function onPaymentComplete(paymentResult) {
       // 임시 주문 정보 삭제 + 장바구니 초기화
       localStorage.removeItem('tempOrder');
       localStorage.removeItem('tempPaymentLinkOrder'); // 결제링크 임시 데이터도 정리
+      localStorage.removeItem('tempDirectOrder'); // 카테고리 직주문 임시 데이터도 정리
       await clearCartEverywhere();
       
       // [Fix] 주문 완료 페이지로 이동 - 서버 응답 데이터 전체 전달
@@ -4805,12 +4812,31 @@ async function renderOrderHistory() {
       const formatQty = (q, defaultUnit = '권') => {
         if (q === undefined || q === null || q === '') return '';
         const asText = String(q).trim();
-        // 괄호와 반복된 단위 제거, 숫자만 추출
-        const cleaned = asText.replace(/[()]/g, '').replace(/권부/g, '').trim();
+        console.log('[formatQty] 입력값:', { original: q, asText, type: typeof q });
+        
+        // 1단계: 모든 괄호 제거
+        const noParen = asText.replace(/[()]/g, '');
+        console.log('[formatQty] 괄호 제거 후:', noParen);
+        
+        // 2단계: 모든 중복 단위 제거 (권권, 부부, 권부, 부권, 개개, 권개, 개권 등)
+        const noRepeat = noParen.replace(/권권|부부|권부|부권|개개|권개|개권|부개|개부/g, '');
+        const cleaned = noRepeat.trim();
+        console.log('[formatQty] 중복 제거 후:', cleaned);
+        
+        // 3단계: 이미 한글 단위가 있으면 그대로, 없으면 기본 단위 추가
+        if (/[가-힣]$/.test(cleaned)) {
+          const numMatch = cleaned.match(/^(\d+)/);
+          const result = numMatch ? `${numMatch[0]}${cleaned.slice(numMatch[0].length)}` : cleaned;
+          console.log('[formatQty] 최종 결과 (단위 있음):', result);
+          return result;
+        }
         const numberMatch = cleaned.match(/^\d+/);
         if (numberMatch) {
-          return `${numberMatch[0]}${defaultUnit}`;
+          const result = `${numberMatch[0]}${defaultUnit}`;
+          console.log('[formatQty] 최종 결과 (단위 추가):', result);
+          return result;
         }
+        console.log('[formatQty] 최종 결과 (기본값):', cleaned);
         return cleaned || '';
       };
       
@@ -5202,7 +5228,13 @@ async function viewOrderDetail(orderId) {
             
             <div style="margin-bottom:16px;">
               <div style="font-size:12px; color:#64748b; margin-bottom:6px;">수량</div>
-              <div style="font-size:14px; color:#0f172a; font-weight:600;">${(order.qty || 0).toString().replace(/권개/g, '권').replace(/개개/g, '개')}</div>
+              <div style="font-size:14px; color:#0f172a; font-weight:600;">${(() => {
+                const qtyStr = String(order.qty || 0).trim();
+                // 괄호 제거, 반복된 단위 제거
+                const cleaned = qtyStr.replace(/[()]/g, '').replace(/권권|부부|권부|부권/g, '');
+                const match = cleaned.match(/(\d+)([가-힣\s]*)$/);
+                return match ? `${match[1]}권` : (cleaned || '0권');
+              })()}</div>
             </div>
             
             ${order.items && order.items.length > 0 ? `
@@ -5228,7 +5260,16 @@ async function viewOrderDetail(orderId) {
                       </div>`
                     : '';
                   
-                  const qtyText = itemOptions.qty ? (typeof itemOptions.qty === 'string' && /부\s*$/.test(itemOptions.qty) ? itemOptions.qty : `${itemOptions.qty}부`) : '';
+                  const qtyText = (() => {
+                    if (!itemOptions.qty) return '';
+                    const qtyStr = String(itemOptions.qty).trim();
+                    // 괄호 제거, 중복 단위 제거 (권권, 부부, 권부, 부권 등)
+                    const cleaned = qtyStr.replace(/[()]/g, '').replace(/권권|부부|권부|부권/g, '').trim();
+                    // 이미 단위가 있으면 그대로, 없으면 부 추가
+                    if (/[가-힣]$/.test(cleaned)) return cleaned;
+                    const numMatch = cleaned.match(/^(\d+)/);
+                    return numMatch ? `${numMatch[1]}부` : cleaned;
+                  })();
                   
                   return `
                     <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
