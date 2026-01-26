@@ -262,12 +262,19 @@ def payment_callback():
                 # 주문 찾기
                 order = Order.query.filter_by(order_id=order_id).first()
                 if order:
-                    # [Fix] mul_no, pay_type 저장 + 주문 상태 paid로 변경
+                    # [Fix] mul_no, pay_type 저장
                     order.mul_no = mul_no
                     order.pay_type = pay_type
-                    order.status = 'paid'  # [Fix] 결제 완료 상태로 변경
+                    
+                    # [Fix] pay_type이 있을 때만 상태를 'paid'로 변경
+                    # pay_type이 없으면 = 아직 미결제 상태 유지 (프론트에서 결제가 완료되지 않았다는 뜻)
+                    if pay_type:
+                        order.status = 'paid'
+                        print(f"✅ 주문 {order_id}에 mul_no={mul_no}, pay_type={pay_type}, status=paid 저장 완료")
+                    else:
+                        print(f"⚠️ 주문 {order_id}에 mul_no={mul_no} 저장만 (pay_type 미수신 - 상태 유지)")
+                    
                     db.session.commit()
-                    print(f"✅ 주문 {order_id}에 mul_no={mul_no}, status=paid 저장 완료")
                 else:
                     print(f"⚠️ 주문을 찾을 수 없음: {order_id} (나중에 업데이트될 수도 있음)")
             except Exception as e:
