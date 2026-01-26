@@ -487,7 +487,8 @@ def get_quote(current_user, quote_id):
 @app.route('/api/orders', methods=['GET'])
 @token_required
 def get_orders(current_user):
-    orders = Order.query.filter_by(user_db_id=current_user.id).all()
+    # [Fix] completed 상태인 주문만 반환 (pending은 숨김)
+    orders = Order.query.filter_by(user_db_id=current_user.id, status='completed').order_by(Order.created_at.desc()).all()
     
     return jsonify({'success': True, 'orders': [o.to_dict() for o in orders]})
 
@@ -998,14 +999,15 @@ def list_admin_orders(current_user):
     search_query = request.args.get('search', '').strip()
     
     if search_query:
-        # 주문번호 또는 고객명으로 검색
+        # 주문번호 또는 고객명으로 검색 (completed만)
         orders = Order.query.filter(
-            (Order.order_id.contains(search_query)) |
-            (Order.user.has(User.name.contains(search_query)))
+            (Order.status == 'completed') &
+            ((Order.order_id.contains(search_query)) |
+             (Order.user.has(User.name.contains(search_query))))
         ).order_by(Order.created_at.desc()).all()
     else:
-        # 전체 주문 목록
-        orders = Order.query.order_by(Order.created_at.desc()).all()
+        # [Fix] completed 상태인 주문만 반환 (pending은 숨김)
+        orders = Order.query.filter_by(status='completed').order_by(Order.created_at.desc()).all()
     
     return jsonify({
         'success': True,
@@ -1108,6 +1110,40 @@ def update_order_payment(current_user, order_id):
         'success': True,
         'message': '주문이 업데이트되었습니다.',
         'order_id': order_id
+    })
+
+# [Fix] PATCH: 결제 완료 후 상태 업데이트
+@app.route('/api/orders/<order_id>', methods=['PATCH'])
+@token_required
+def update_order_status(current_user, order_id):
+    """주문 상태 업데이트 (pending → completed)"""
+    print(f"[PATCH /api/orders/{order_id}] 요청 사용자: {current_user.id}")
+    
+    order = Order.query.filter_by(order_id=order_id).first()
+    if not order:
+        print(f"[PATCH] 주문을 찾을 수 없음: {order_id}")
+        return jsonify({'success': False, 'message': '주문을 찾을 수 없습니다.'}), 404
+    
+    # 현재 사용자의 주문인지 확인
+    if order.user_db_id != current_user.id:
+        print(f"[PATCH] 권한 없음: 요청자={current_user.id}, 주문자={order.user_db_id}")
+        return jsonify({'success': False, 'message': '다른 사용자의 주문은 수정할 수 없습니다.'}), 403
+    
+    data = request.json
+    
+    # status 업데이트 (pending → completed)
+    if 'status' in data:
+        order.status = data['status']
+        print(f"[PATCH] status 업데이트: {data['status']}")
+    
+    db.session.commit()
+    print(f"[PATCH] ✅ 주문 상태 업데이트 완료: {order_id} → {order.status}")
+    
+    return jsonify({
+        'success': True,
+        'message': f'주문 상태가 {order.status}로 업데이트되었습니다.',
+        'order_id': order_id,
+        'status': order.status
     })
 
 @app.route('/api/orders/<order_id>', methods=['DELETE'])

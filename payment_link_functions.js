@@ -519,7 +519,64 @@ async function processPaymentLink(linkCode) {
       console.error('사용자 정보 조회 실패:', e);
     }
 
-    // [Fix] 임시 주문 데이터를 localStorage에 저장 (결제 완료 후 서버 전송)
+    // [Fix] 서버에 먼저 주문을 생성 (상태: pending/미결제)
+    // 서버에서 orderId를 리턴받아 결제 팝업에서 var1으로 전달
+    const preOrderPayload = {
+      items: [{
+        id: 'PAYMENT_LINK',
+        category: '개인결제',
+        title: link.product_name,
+        qty: 1,
+        price: link.price
+      }],
+      total_price: link.price,
+      delivery_info: {
+        recipient: userData?.name || '고객',
+        phone: userData?.phone || '',
+        address: '',
+        requirements: ''
+      },
+      order_details: {
+        payment_link_code: linkCode,
+        payment_link_specs: memoParsed?.specs || null,
+        payment_link_note: memoParsed?.note || '',
+        payment_link_raw_memo: link.memo || ''
+      },
+      status: 'pending' // [Fix] 미결제 상태로 생성
+    };
+
+    let orderId;
+    try {
+      const createOrderRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(preOrderPayload)
+      });
+
+      if (!createOrderRes.ok) {
+        throw new Error(`주문 생성 실패: ${createOrderRes.statusText}`);
+      }
+
+      const createOrderData = await createOrderRes.json();
+      if (!createOrderData.success) {
+        throw new Error('주문 생성 실패');
+      }
+
+      orderId = createOrderData.order_id;
+      console.log('[processPaymentLink] ✅ 미결제 주문 생성 완료:', orderId);
+      
+      // sessionStorage에 orderId 저장 (monitorPaymentWindow에서 사용)
+      sessionStorage.setItem('pendingPaymentLinkOrderId', orderId);
+    } catch (e) {
+      console.error('[processPaymentLink] 주문 생성 실패:', e);
+      alert('주문 생성에 실패했습니다. 다시 시도해주세요.');
+      return;
+    }
+
+    // [Fix] 임시 주문 데이터를 localStorage에 저장 (결제 완료 후 사용)
     const tempPaymentLinkOrder = {
       items: [{
         id: 'PAYMENT_LINK',
@@ -530,10 +587,10 @@ async function processPaymentLink(linkCode) {
       }],
       total_price: link.price,
       delivery_info: {
-        name: userData?.name || '고객',
+        recipient: userData?.name || '고객',
         phone: userData?.phone || '',
-        addr: '',
-        addr_detail: ''
+        address: '',
+        requirements: ''
       },
       order_details: {
         payment_link_code: linkCode,
@@ -567,7 +624,7 @@ async function processPaymentLink(linkCode) {
     PayApp.setDefault('shopname', '건우프린팅');
     console.log('[processPaymentLink] PayApp.setDefault 완료');
 
-    // [Fix] 결제 완료 후 주문이 생성되므로 여기서는 orderId 없음
+    // [Fix] 결제 완료 후 주문이 생성되므로 여기서는 orderId 포함
     const returnUrl = window.location.origin + '/';
 
     console.log('[processPaymentLink] PayApp.setParam 호출 중...');
@@ -580,8 +637,8 @@ async function processPaymentLink(linkCode) {
       'redirectpay': '1',
       'returnurl': returnUrl,
       'feedbackurl': window.location.origin + '/api/payment-callback',
-      'var1': '', // [Fix] 결제 완료 후 주문 생성
-      'var2': linkCode,
+      'var1': orderId || '', // [Fix] 주문번호
+      'var2': linkCode, // 결제링크 코드
       'skip_cstpage': 'y'
     });
     console.log('[processPaymentLink] PayApp.setParam 완료');
