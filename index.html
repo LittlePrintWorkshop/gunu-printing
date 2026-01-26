@@ -887,8 +887,15 @@
               <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('completed')">
                 <div style="width:80px; height:80px; background:#10b981; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">✓</div>
                 <div style="text-align:center;">
-                  <div style="font-size:12px; color:#64748b; font-weight:600;">배송완료</div>
+                  <div style="font-size:12px; color:#64748b; font-weight:600;">주문접수</div>
                   <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="stat-completed">0건</div>
+                </div>
+              </div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('delivered')">
+                <div style="width:80px; height:80px; background:#6366f1; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">🎁</div>
+                <div style="text-align:center;">
+                  <div style="font-size:12px; color:#64748b; font-weight:600;">배송완료</div>
+                  <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="stat-delivered">0건</div>
                 </div>
               </div>
             </div>

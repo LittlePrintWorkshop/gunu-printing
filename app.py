@@ -1105,7 +1105,7 @@ def update_order_status(current_user, order_id):
     new_status = data.get('status', '').strip()
     
     # 허용된 상태
-    allowed_statuses = ['pending', 'preparing', 'shipping', 'completed']
+    allowed_statuses = ['pending', 'completed', 'preparing', 'shipping', 'delivered']
     if new_status not in allowed_statuses:
         return jsonify({'success': False, 'message': '유효하지 않은 상태입니다.'}), 400
     

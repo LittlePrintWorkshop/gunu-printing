@@ -1882,7 +1882,8 @@ function updateAdminOrderStats(orders) {
     pending: 0,
     preparing: 0,
     shipping: 0,
-    completed: 0
+    completed: 0,
+    delivered: 0
   };
   
   orders.forEach(order => {
@@ -1890,17 +1891,20 @@ function updateAdminOrderStats(orders) {
     else if (order.status === 'preparing') stats.preparing++;
     else if (order.status === 'shipping') stats.shipping++;
     else if (order.status === 'completed') stats.completed++;
+    else if (order.status === 'delivered') stats.delivered++;
   });
   
   const statPending = get('stat-pending');
   const statPreparing = get('stat-preparing');
   const statShipping = get('stat-shipping');
   const statCompleted = get('stat-completed');
+  const statDelivered = get('stat-delivered');
   
   if (statPending) statPending.textContent = stats.pending + '건';
   if (statPreparing) statPreparing.textContent = stats.preparing + '건';
   if (statShipping) statShipping.textContent = stats.shipping + '건';
   if (statCompleted) statCompleted.textContent = stats.completed + '건';
+  if (statDelivered) statDelivered.textContent = stats.delivered + '건';
 }
 
 // 관리자 주문 날짜 범위 설정
@@ -2087,10 +2091,11 @@ function renderAdminOrderTable(orders) {
     const orderId = order.id || order.order_id || 'N/A';
     
     const statusMap = {
-      'pending': { color: '#f59e0b', text: '접수' },
-      'preparing': { color: '#3b82f6', text: '준비중' },
-      'shipping': { color: '#8b5cf6', text: '배송출발' },
-      'completed': { color: '#10b981', text: '완료' },
+      'pending': { color: '#f59e0b', text: '신규' },
+      'completed': { color: '#10b981', text: '접수' },
+      'preparing': { color: '#3b82f6', text: '제작' },
+      'shipping': { color: '#8b5cf6', text: '배송' },
+      'delivered': { color: '#6366f1', text: '완료' },
       'cancelled': { color: '#ef4444', text: '취소' },
       'refund_requested': { color: '#f97316', text: '환불요청' },
       'refunded': { color: '#6b7280', text: '환불완료' }
@@ -2146,12 +2151,14 @@ function renderAdminOrderTable(orders) {
             <button onclick="approveRefund('${orderId}')" style="padding:4px 8px; background:#10b981; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">환불승인</button>
             <button onclick="rejectRefund('${orderId}')" style="padding:4px 8px; background:#ef4444; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">환불거절</button>
           ` : order.status === 'pending' ? `
-            <button onclick="updateAdminOrderStatus('${orderId}', 'preparing')" style="padding:4px 8px; background:#3b82f6; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">제작</button>
+            <button onclick="updateAdminOrderStatus('${orderId}', 'completed')" style="padding:4px 8px; background:#10b981; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">접수</button>
             <button onclick="updateAdminOrderStatus('${orderId}', 'cancelled')" style="padding:4px 8px; background:#ef4444; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">취소</button>
+          ` : order.status === 'completed' ? `
+            <button onclick="updateAdminOrderStatus('${orderId}', 'preparing')" style="padding:4px 8px; background:#3b82f6; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">제작</button>
           ` : order.status === 'preparing' ? `
             <button onclick="updateAdminOrderStatus('${orderId}', 'shipping')" style="padding:4px 8px; background:#8b5cf6; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">배송</button>
           ` : order.status === 'shipping' ? `
-            <button onclick="updateAdminOrderStatus('${orderId}', 'completed')" style="padding:4px 8px; background:#10b981; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">완료</button>
+            <button onclick="updateAdminOrderStatus('${orderId}', 'delivered')" style="padding:4px 8px; background:#6366f1; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">완료</button>
           ` : ''}
         </div>
       </td>
