@@ -354,6 +354,14 @@ def payment_complete_close():
 
 @app.route('/<path:path>', methods=['GET', 'POST', 'HEAD', 'OPTIONS'])
 def static_files(path):
+    # [Fix] /api/ 로 시작하면 처리하지 않음 (API 라우트에 맡김)
+    if path.startswith('api/'):
+        return '', 404
+    
+    # [Fix] /payment-complete-close는 정적 파일이 아님 (이미 정의된 라우트)
+    if path == 'payment-complete-close':
+        return '', 404
+    
     # JavaScript 파일의 MIME type을 명시적으로 설정
     if path.endswith('.js'):
         return send_from_directory('.', path, mimetype='application/javascript')

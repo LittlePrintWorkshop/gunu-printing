@@ -5251,14 +5251,15 @@ async function renderOrderHistory() {
       const statusColor = statusColors[order.status] || '#64748b';
       
       const statusText = {
-        'pending': '접수완료',
+        'pending': '결제대기',
+        'completed': '주문접수',
         'preparing': '제작중',
         'shipping': '배송중',
-        'completed': '배송완료',
+        'delivered': '배송완료',
         'cancelled': '취소',
         'refund_requested': '환불요청',
         'refunded': '환불완료'
-      }[order.status] || order.status || '접수완료';
+      }[order.status] || order.status || '주문접수';
       
       return `
           <div style="background:#fff; border:1px solid var(--line); border-radius:16px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
