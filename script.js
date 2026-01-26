@@ -90,6 +90,13 @@ window.addEventListener('message', (event) => {
   
   console.log('메시지 수신:', event.data);
   
+  // [Fix] PayApp 팝업에서 보내는 완료 신호 (returnurl에서 postMessage)
+  if (event.data.type === 'payment_completed_from_payapp') {
+    console.log('[message] PayApp 팝업 완료 신호 수신');
+    // 팝업이 자동으로 닫혀야 하지만, 혹시 모르니 강제 처리 없음
+    // monitorPaymentWindow가 팝업 닫힘을 감지할 것
+  }
+  
   if (event.data.type === 'paymentComplete') {
     console.log('팝업 창에서 결제 완료 메시지 수신:', event.data);
     
@@ -3848,8 +3855,8 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   const quantity = get('sum-qty')?.textContent || '';
   const displayGoodname = quantity ? `${category} (${quantity})` : category;
   
-  // [Fix] returnUrl에 order_complete=true 신호 추가 - 결제 완료 후 완료창 표시
-  const returnUrl = window.location.origin + '/';
+  // [Fix] returnUrl을 /payment-complete-close로 설정 - 팝업 자동 닫기
+  const returnUrl = window.location.origin + '/payment-complete-close';
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
@@ -4828,8 +4835,8 @@ async function startPayment(totalAmount, user, orderId) {
   const goodnames = cart.map(item => stripQtyFromName(item.name) || '인쇄 상품').join(', ');
   const displayGoodname = goodnames.length > 30 ? goodnames.substring(0, 30) + '...' : goodnames;
   
-  // [Fix] returnUrl을 홈으로 설정 (실제 완료는 monitorPaymentWindow에서 mul_no 확인으로 처리)
-  const returnUrl = window.location.origin + '/';
+  // [Fix] returnUrl을 /payment-complete-close로 설정 - 팝업 자동 닫기
+  const returnUrl = window.location.origin + '/payment-complete-close';
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',

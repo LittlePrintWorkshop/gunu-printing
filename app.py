@@ -292,6 +292,51 @@ def payment_callback():
         # 에러가 발생해도 OK 반환 (PayApp 재시도 방지)
         return 'OK', 200
 
+@app.route('/payment-complete-close')
+def payment_complete_close():
+    """PayApp returnurl - 팝업 닫기 신호 전송"""
+    print("[payment_complete_close] PayApp에서 리다이렉트됨 - 팝업 닫기")
+    
+    # PayApp 팝업 내에서 실행되는 페이지
+    # opener(부모 창)에 메시지를 보내서 팝업을 닫도록 함
+    html = '''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>결제 완료</title>
+</head>
+<body>
+    <script>
+        // 팝업이 opener(부모 창)의 제어를 받을 수 있는지 확인
+        if (window.opener) {
+            console.log('[payment_complete_close] opener 감지됨 - 부모 창에 신호 전송');
+            try {
+                // 부모 창에 완료 신호 전송
+                window.opener.postMessage({
+                    type: 'payment_completed_from_payapp',
+                    message: 'PayApp에서 결제 완료됨'
+                }, '*');
+                console.log('[payment_complete_close] 신호 전송 완료');
+            } catch (e) {
+                console.error('[payment_complete_close] 신호 전송 실패:', e);
+            }
+            
+            // 팝업 자동 닫기 시도
+            setTimeout(() => {
+                console.log('[payment_complete_close] 팝업 닫기 시도 중...');
+                window.close();
+            }, 500);
+        } else {
+            console.log('[payment_complete_close] opener 없음 - 일반 페이지로 이동');
+            window.location.href = '/';
+        }
+    </script>
+    <p>결제가 완료되었습니다. 잠시만 기다려주세요...</p>
+</body>
+</html>'''
+    
+    return html
+
 @app.route('/<path:path>', methods=['GET', 'POST', 'HEAD', 'OPTIONS'])
 def static_files(path):
     # JavaScript 파일의 MIME type을 명시적으로 설정
