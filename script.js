@@ -3666,36 +3666,69 @@ function monitorPaymentWindow(payappWindow) {
           false
         );
         
-        // [Fix] 팝업 닫힘 신호를 서버로 전송 (서버가 처리하도록)
+        // [Fix] 팝업 닫힘 시 서버의 현재 주문 상태 확인
         const deleteOrderId = sessionStorage.getItem('pendingOrderId') ||
                               sessionStorage.getItem('pendingPaymentLinkOrderId');
         console.log('[monitorPaymentWindow] 팝업 닫힘 - 주문ID:', deleteOrderId);
         
-        // 서버에 결제 취소 신호 전송
         if (deleteOrderId) {
           try {
             const token = getToken();
-            console.log('[monitorPaymentWindow] 서버로 결제 취소 신호 전송...');
+            console.log('[monitorPaymentWindow] 서버에서 주문 상태 확인 중...');
             
-            const cancelRes = await fetch(`/api/orders/${deleteOrderId}/cancel`, {
-              method: 'POST',
+            // 1단계: 서버에서 현재 주문 상태 확인
+            const statusRes = await fetch(`/api/orders/${deleteOrderId}`, {
+              method: 'GET',
               headers: { 'Authorization': `Bearer ${token}` }
             });
-
-            const cancelData = await cancelRes.json();
-            console.log('[monitorPaymentWindow] 취소 응답:', cancelData);
-
-            if (cancelRes.ok && cancelData.success) {
-              console.log('[monitorPaymentWindow] ✅ 주문 취소 처리 완료');
+            
+            if (!statusRes.ok) {
+              console.error('[monitorPaymentWindow] 주문 조회 실패:', statusRes.status);
               hidePaymentProcessing();
-              alert('결제가 취소되었습니다.');
+              alert('주문 정보를 조회할 수 없습니다.');
+              sessionStorage.removeItem('pendingOrderId');
+              sessionStorage.removeItem('pendingPaymentLinkOrderId');
+              return;
+            }
+            
+            const orderData = await statusRes.json();
+            console.log('[monitorPaymentWindow] 서버 주문 상태:', orderData.status, '| mul_no:', orderData.mul_no);
+            
+            // 2단계: 상태에 따라 처리
+            if (orderData.status === 'completed') {
+              // 이미 결제 완료됨 - 완료 화면으로 이동
+              console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제 완료됨');
+              hidePaymentProcessing();
+              showOrderComplete(orderData);
+            } else if (orderData.status === 'pending') {
+              // 아직 미결제 - 취소 신호 전송
+              console.log('[monitorPaymentWindow] 주문이 pending 상태 - 취소 신호 전송');
+              
+              const cancelRes = await fetch(`/api/orders/${deleteOrderId}/cancel`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+              
+              const cancelData = await cancelRes.json();
+              console.log('[monitorPaymentWindow] 취소 응답:', cancelData);
+              
+              if (cancelRes.ok && cancelData.success) {
+                console.log('[monitorPaymentWindow] ✅ 주문 취소 처리 완료');
+                hidePaymentProcessing();
+                alert('결제가 취소되었습니다.');
+              } else {
+                console.error('[monitorPaymentWindow] 취소 처리 실패:', cancelData.message);
+                hidePaymentProcessing();
+                alert('결제 처리 중 오류가 발생했습니다.');
+              }
             } else {
-              console.error('[monitorPaymentWindow] 취소 처리 실패:', cancelData.message);
+              // 다른 상태 (cancelled 등)
+              console.log('[monitorPaymentWindow] 주문 상태:', orderData.status);
               hidePaymentProcessing();
-              alert('결제 처리 중 오류가 발생했습니다.');
+              alert('주문 처리 상태: ' + orderData.status);
             }
           } catch (e) {
-            console.error('[monitorPaymentWindow] 취소 신호 전송 중 오류:', e);
+            console.error('[monitorPaymentWindow] 상태 확인 중 오류:', e);
             hidePaymentProcessing();
             alert('결제 처리 중 오류가 발생했습니다.');
           }
