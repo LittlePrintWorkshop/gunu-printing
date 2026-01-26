@@ -3719,6 +3719,10 @@ function monitorPaymentWindow(payappWindow) {
               // 이미 결제 완료됨 - 모래시계를 ✅로 변경
               console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제 완료됨 (상태:', order.status + ')');
               
+              // [Fix] 장바구니 비우기
+              await clearCartEverywhere();
+              console.log('[monitorPaymentWindow] ✅ 장바구니 비움');
+              
               // [Fix] 팝업 강제 종료 시도 (여러 방법 시도)
               try {
                 if (payappWindow && !payappWindow.closed) {

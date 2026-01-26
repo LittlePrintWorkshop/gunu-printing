@@ -303,10 +303,19 @@ def payment_complete_close():
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>결제 완료</title>
+    <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzI1NjNlYiIvPjx0ZXh0IHg9IjI1NiIgeT0iMzgwIiBmb250LXNpemU9IjI4MCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPkc8L3RleHQ+PC9zdmc+" type="image/svg+xml">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; text-align: center; }
+        p { color: #333; }
+    </style>
 </head>
 <body>
+    <p>결제가 완료되었습니다. 잠시만 기다려주세요...</p>
     <script>
+        console.log('[payment_complete_close] 페이지 로드됨');
+        
         // 팝업이 opener(부모 창)의 제어를 받을 수 있는지 확인
         if (window.opener) {
             console.log('[payment_complete_close] opener 감지됨 - 부모 창에 신호 전송');
@@ -321,17 +330,23 @@ def payment_complete_close():
                 console.error('[payment_complete_close] 신호 전송 실패:', e);
             }
             
-            // 팝업 자동 닫기 시도
-            setTimeout(() => {
-                console.log('[payment_complete_close] 팝업 닫기 시도 중...');
-                window.close();
-            }, 500);
+            // 팝업 자동 닫기 시도 (여러 번 시도)
+            const closeAttempts = [300, 800, 1200, 1600];
+            closeAttempts.forEach((delay, index) => {
+                setTimeout(() => {
+                    if (!window.closed) {
+                        console.log(`[payment_complete_close] 팝업 닫기 시도 ${index + 1}/4 (${delay}ms)`);
+                        window.close();
+                    }
+                }, delay);
+            });
         } else {
             console.log('[payment_complete_close] opener 없음 - 일반 페이지로 이동');
-            window.location.href = '/';
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
         }
     </script>
-    <p>결제가 완료되었습니다. 잠시만 기다려주세요...</p>
 </body>
 </html>'''
     
