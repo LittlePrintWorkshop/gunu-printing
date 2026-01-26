@@ -358,8 +358,8 @@ def static_files(path):
     if path.startswith('api/'):
         return '', 404
     
-    # [Fix] /payment-complete-close는 정적 파일이 아님 (이미 정의된 라우트)
-    if path == 'payment-complete-close':
+    # [Fix] 특정 API 라우트는 처리하지 않음
+    if path in ['payment-complete-close', 'login', 'signup']:
         return '', 404
     
     # JavaScript 파일의 MIME type을 명시적으로 설정
@@ -1067,15 +1067,14 @@ def list_admin_orders(current_user):
     search_query = request.args.get('search', '').strip()
     
     if search_query:
-        # 주문번호 또는 고객명으로 검색 (completed만)
+        # 주문번호 또는 고객명으로 검색 (모든 상태)
         orders = Order.query.filter(
-            (Order.status == 'completed') &
             ((Order.order_id.contains(search_query)) |
              (Order.user.has(User.name.contains(search_query))))
         ).order_by(Order.created_at.desc()).all()
     else:
-        # [Fix] completed 상태인 주문만 반환 (pending은 숨김)
-        orders = Order.query.filter_by(status='completed').order_by(Order.created_at.desc()).all()
+        # [Fix] 모든 상태의 주문 반환 (pending, completed, preparing, shipping 등)
+        orders = Order.query.order_by(Order.created_at.desc()).all()
     
     return jsonify({
         'success': True,
