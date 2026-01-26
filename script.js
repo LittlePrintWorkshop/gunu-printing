@@ -5399,6 +5399,37 @@ async function requestRefund(orderId) {
       return;
     }
     
+    // [Fix] 현재 주문 상태 확인
+    const orderRes = await fetch(`/api/orders/${orderId}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (!orderRes.ok) {
+      alert('주문 정보를 조회할 수 없습니다.');
+      return;
+    }
+    
+    const orderData = await orderRes.json();
+    const order = orderData.order;
+    
+    // [Fix] 상태별 환불 규칙
+    if (order.status === 'completed') {
+      // 신규주문 상태: 자유로 환불 가능
+      if (!confirm('환불을 요청하시겠습니까?')) return;
+    } else if (order.status === 'preparing' || order.status === 'shipping' || order.status === 'delivered') {
+      // 제작중, 배송중, 배송완료: 관리자 승인 필요
+      alert('제작 이상 단계에서는 관리자 승인이 필요합니다.\n관리자에게 연락주세요.');
+      return;
+    } else if (order.status === 'refund_requested' || order.status === 'refunded') {
+      // 이미 환불 요청됨
+      alert('이미 환불이 요청되었거나 완료된 주문입니다.');
+      return;
+    } else {
+      alert('이 상태의 주문은 환불할 수 없습니다.');
+      return;
+    }
+    
     console.log('환불 요청:', orderId);
     
     const response = await fetch(`/api/orders/${orderId}/refund`, {
