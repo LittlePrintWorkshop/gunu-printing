@@ -3596,12 +3596,11 @@ function monitorPaymentWindow(payappWindow) {
   // 매 500ms마다 팝업 상태 확인
   const checkInterval = setInterval(async () => {
     try {
-      // ✅ 만약 sesssionStorage에서 추적 ID가 제거되었다면 (결제 완료됨), 모니터링 중단
-      const pendingOrderId = sessionStorage.getItem('pendingOrderId') || 
-                              sessionStorage.getItem('pendingPaymentLinkOrderId');
-      if (!pendingOrderId) {
-        console.log('[monitorPaymentWindow] 결제 완료됨 - 모니터링 중단');
+      // [Fix] window.paymentCompleted 플래그로 결제 완료 감지
+      if (window.paymentCompleted) {
+        console.log('[monitorPaymentWindow] 결제 완료 - 모니터링 중단');
         clearInterval(checkInterval);
+        window.paymentCompleted = false; // 플래그 초기화
         return;
       }
       
@@ -4608,10 +4607,9 @@ async function onPaymentComplete(paymentResult) {
     return;
   }
 
-  // ✅ 결제 완료됨 - 임시 주문 ID 삭제 (팝업 모니터링이 삭제하지 않도록)
-  sessionStorage.removeItem('pendingOrderId');
-  sessionStorage.removeItem('pendingPaymentLinkOrderId');
-  console.log('[onPaymentComplete] ✅ 결제 완료 - 임시 주문 추적 제거');
+  // [Fix] 결제 완료 플래그 설정 - monitorPaymentWindow에서 감지하여 모니터링 중단
+  window.paymentCompleted = true;
+  console.log('[onPaymentComplete] ✅ 결제 완료 - 결제 완료 플래그 설정');
 
   // ✅ 임시 주문 데이터에도 mul_no를 저장 (monitorPaymentWindow에서 감지하도록)
   let tempOrder = JSON.parse(localStorage.getItem('tempOrder') || '{}');
