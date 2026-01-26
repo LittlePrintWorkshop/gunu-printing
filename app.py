@@ -1077,14 +1077,15 @@ def list_admin_orders(current_user):
     search_query = request.args.get('search', '').strip()
     
     if search_query:
-        # 주문번호 또는 고객명으로 검색 (모든 상태)
+        # 주문번호 또는 고객명으로 검색 (pending 제외 - 결제 완료된 주문만)
         orders = Order.query.filter(
             ((Order.order_id.contains(search_query)) |
-             (Order.user.has(User.name.contains(search_query))))
+             (Order.user.has(User.name.contains(search_query)))),
+            Order.status != 'pending'  # [Fix] pending 상태 제외
         ).order_by(Order.created_at.desc()).all()
     else:
-        # [Fix] 모든 상태의 주문 반환 (pending, completed, preparing, shipping 등)
-        orders = Order.query.order_by(Order.created_at.desc()).all()
+        # [Fix] pending 상태 제외 (결제 완료된 주문만 표시)
+        orders = Order.query.filter(Order.status != 'pending').order_by(Order.created_at.desc()).all()
     
     return jsonify({
         'success': True,

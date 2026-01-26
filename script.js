@@ -1876,34 +1876,30 @@ async function loadAdminOrderList() {
   }
 }
 
-// 주문 상태별 통계 업데이트
+// 주문 상태별 통계 업데이트 (pending 제외)
 function updateAdminOrderStats(orders) {
   const stats = {
-    pending: 0,
+    completed: 0,
     preparing: 0,
     shipping: 0,
-    completed: 0,
     delivered: 0
   };
   
   orders.forEach(order => {
-    if (order.status === 'pending') stats.pending++;
+    if (order.status === 'completed') stats.completed++;
     else if (order.status === 'preparing') stats.preparing++;
     else if (order.status === 'shipping') stats.shipping++;
-    else if (order.status === 'completed') stats.completed++;
     else if (order.status === 'delivered') stats.delivered++;
   });
   
-  const statPending = get('stat-pending');
+  const statCompleted = get('stat-completed');
   const statPreparing = get('stat-preparing');
   const statShipping = get('stat-shipping');
-  const statCompleted = get('stat-completed');
   const statDelivered = get('stat-delivered');
   
-  if (statPending) statPending.textContent = stats.pending + '건';
+  if (statCompleted) statCompleted.textContent = stats.completed + '건';
   if (statPreparing) statPreparing.textContent = stats.preparing + '건';
   if (statShipping) statShipping.textContent = stats.shipping + '건';
-  if (statCompleted) statCompleted.textContent = stats.completed + '건';
   if (statDelivered) statDelivered.textContent = stats.delivered + '건';
 }
 
@@ -3675,8 +3671,8 @@ function monitorPaymentWindow(payappWindow) {
         
         // [Fix] 홈페이지로 가지 않고 "결제 확인 중..." 상태 유지
         updatePaymentProcessingMessage(
-          '결제 처리 중입니다',
-          '결제 결과를 확인하는 중입니다.<br>팝업이 자동으로 닫혀야 합니다.<br>닫혀있지 않으면 수동으로 닫아주세요.',
+          '⏳ 결제 처리 중입니다',
+          '<strong>팝업이 자동으로 닫혀야 합니다.</strong><br><br>만약 팝업이 닫혀있지 않으면:<br>1. 팝업 우측 상단 X 버튼을 클릭하여 닫아주세요<br>2. 자동으로 결제 결과를 확인하게 됩니다',
           false
         );
         
