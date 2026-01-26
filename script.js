@@ -3592,6 +3592,15 @@ function monitorPaymentWindow(payappWindow) {
   // 매 500ms마다 팝업 상태 확인
   const checkInterval = setInterval(async () => {
     try {
+      // ✅ 만약 sesssionStorage에서 추적 ID가 제거되었다면 (결제 완료됨), 모니터링 중단
+      const pendingOrderId = sessionStorage.getItem('pendingOrderId') || 
+                              sessionStorage.getItem('pendingPaymentLinkOrderId');
+      if (!pendingOrderId) {
+        console.log('[monitorPaymentWindow] 결제 완료됨 - 모니터링 중단');
+        clearInterval(checkInterval);
+        return;
+      }
+      
       if (payappWindow.closed && !isClosed) {
         isClosed = true;
         console.log('[monitorPaymentWindow] 팝업이 닫혔습니다');
@@ -3605,16 +3614,16 @@ function monitorPaymentWindow(payappWindow) {
           hidePaymentProcessing();
           
           // 임시 저장된 주문ID 확인 (개인결제링크 또는 일반 주문 모두 대응)
-          let pendingOrderId = sessionStorage.getItem('pendingOrderId') || 
-                                sessionStorage.getItem('pendingPaymentLinkOrderId');
-          if (pendingOrderId) {
-            console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', pendingOrderId);
+          let deleteOrderId = sessionStorage.getItem('pendingOrderId') || 
+                               sessionStorage.getItem('pendingPaymentLinkOrderId');
+          if (deleteOrderId) {
+            console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', deleteOrderId);
             try {
               const token = getToken();
               console.log('[monitorPaymentWindow] 토큰:', token ? 'O' : 'X');
               console.log('[monitorPaymentWindow] 삭제 요청 시작...');
               
-              const deleteRes = await fetch(`/api/orders/${pendingOrderId}`, {
+              const deleteRes = await fetch(`/api/orders/${deleteOrderId}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
               });
@@ -4645,14 +4654,32 @@ async function onPaymentComplete(paymentResult) {
   sessionStorage.removeItem('pendingPaymentLinkOrderId');
   console.log('[onPaymentComplete] ✅ 결제 완료 - 임시 주문 추적 제거');
 
-  // 임시 주문 정보 가져오기 (결제링크용 + 일반주문용 둘다 확인)
+  // ✅ 임시 주문 데이터에도 mul_no를 저장 (monitorPaymentWindow에서 감지하도록)
   let tempOrder = JSON.parse(localStorage.getItem('tempOrder') || '{}');
   if (!tempOrder.order_id) {
-    // 결제링크에서 온 경우
     const paymentLinkOrder = JSON.parse(localStorage.getItem('tempPaymentLinkOrder') || '{}');
     if (paymentLinkOrder.order_id) {
       tempOrder = paymentLinkOrder;
-      console.log('[onPaymentComplete] 결제링크 주문 데이터 사용:', tempOrder);
+    }
+  }
+  
+  // tempOrder에 mul_no를 저장해서 monitorPaymentWindow가 삭제하지 않도록 함
+  tempOrder.mul_no = paymentResult.mul_no;
+  if (tempOrder.linkCode) {
+    localStorage.setItem('tempPaymentLinkOrder', JSON.stringify(tempOrder));
+  } else {
+    localStorage.setItem('tempOrder', JSON.stringify(tempOrder));
+  }
+  console.log('[onPaymentComplete] ✅ tempOrder에 mul_no 저장:', paymentResult.mul_no);
+
+  // 임시 주문 정보 가져오기 (결제링크용 + 일반주문용 둘다 확인)
+  let tempOrderForAPI = JSON.parse(localStorage.getItem('tempOrder') || '{}');
+  if (!tempOrderForAPI.order_id) {
+    // 결제링크에서 온 경우
+    const paymentLinkOrder = JSON.parse(localStorage.getItem('tempPaymentLinkOrder') || '{}');
+    if (paymentLinkOrder.order_id) {
+      tempOrderForAPI = paymentLinkOrder;
+      console.log('[onPaymentComplete] 결제링크 주문 데이터 사용:', tempOrderForAPI);
     }
   }
   
@@ -4672,9 +4699,9 @@ async function onPaymentComplete(paymentResult) {
         'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
       },
       body: JSON.stringify({
-        items: tempOrder.items,
-        total_price: tempOrder.total_price,
-        delivery_info: tempOrder.delivery_info,
+        items: tempOrderForAPI.items,
+        total_price: tempOrderForAPI.total_price,
+        delivery_info: tempOrderForAPI.delivery_info,
         payment_info: paymentInfo
       })
     });
@@ -4688,7 +4715,7 @@ async function onPaymentComplete(paymentResult) {
       const orderCode = result.order_code || `${orderId}-${customerCode || ''}`;
       
       // 결제링크 사용 처리 (링크로 결제한 경우에만)
-      const paymentLinkCode = tempOrder.linkCode;
+      const paymentLinkCode = tempOrderForAPI.linkCode;
       if (paymentLinkCode) {
         try {
           console.log('[onPaymentComplete] 결제링크 사용 처리:', paymentLinkCode);
@@ -4710,7 +4737,7 @@ async function onPaymentComplete(paymentResult) {
       await clearCartEverywhere();
       
       // 주문 완료 페이지로 이동
-      showOrderComplete(orderId, orderCode, tempOrder.total_price);
+      showOrderComplete(orderId, orderCode, tempOrderForAPI.total_price);
     } else {
       alert('주문 처리에 실패했습니다: ' + (result.message || ''));
     }
