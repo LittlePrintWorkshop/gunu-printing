@@ -59,8 +59,6 @@ function showCreatePaymentLinkForm() {
   // 입력 폼 초기화
   if (get('pay-link-product')) get('pay-link-product').value = '';
   if (get('pay-link-price')) get('pay-link-price').value = '';
-  if (get('pay-link-customer-name')) get('pay-link-customer-name').value = '';
-  if (get('pay-link-customer-phone')) get('pay-link-customer-phone').value = '';
   if (get('pay-link-memo')) get('pay-link-memo').value = '';
   if (get('pay-link-product-type')) get('pay-link-product-type').value = 'book';
   if (get('pay-link-cover-paper')) get('pay-link-cover-paper').value = '';
@@ -96,8 +94,6 @@ function hideCreatePaymentLinkForm() {
 async function createPaymentLink() {
   const product_name = get('pay-link-product')?.value?.trim();
   const price = parseFloat(get('pay-link-price')?.value || 0);
-  const customer_name = get('pay-link-customer-name')?.value?.trim();
-  const customer_phone = get('pay-link-customer-phone')?.value?.trim();
   const memo = get('pay-link-memo')?.value?.trim();
   const productType = get('pay-link-product-type')?.value || 'book';
   const specialNote = get('pay-link-special-note')?.value?.trim();
@@ -111,15 +107,6 @@ async function createPaymentLink() {
     alert('결제금액은 1,000원 이상이어야 합니다.');
     return;
   }
-
-  let specs = null;
-
-  if (productType === 'book') {
-    const coverPaper = get('pay-link-cover-paper')?.value?.trim();
-    const innerPaper = get('pay-link-inner-paper')?.value?.trim();
-    const totalPages = get('pay-link-total-pages')?.value?.trim();
-    const binding = get('pay-link-binding')?.value;
-    const printQty = get('pay-link-print-qty')?.value?.trim();
 
     if (!coverPaper || !innerPaper || !totalPages || !binding || !printQty) {
       alert('책 사양을 모두 입력해주세요.');
@@ -167,8 +154,8 @@ async function createPaymentLink() {
       body: JSON.stringify({
         product_name,
         price,
-        customer_name,
-        customer_phone,
+        customer_name: null,  // 고객명은 결제 시 자동으로 수집됨
+        customer_phone: null, // 전화번호는 결제 시 자동으로 수집됨
         memo: memoPayload
       })
     });
@@ -523,15 +510,7 @@ async function processPaymentLink(linkCode) {
       console.error('사용자 정보 조회 실패:', e);
     }
 
-    // 배송정보 확인 팝업 표시
-    console.log('[processPaymentLink] 배송정보 확인 팝업 표시 중...');
-    const confirmed = await showDeliveryConfirmation(link, userData, memoParsed);
-    if (!confirmed) {
-      console.log('[processPaymentLink] 사용자가 취소함');
-      return;
-    }
-
-    // 주문 생성 (사용자가 확인한 배송정보 사용)
+    // 주문 생성 (로그인한 사용자의 정보를 사용)
     const preOrderPayload = {
       items: [{
         id: 'PAYMENT_LINK',
@@ -542,10 +521,10 @@ async function processPaymentLink(linkCode) {
       }],
       total_price: link.price,
       delivery_info: {
-        name: confirmed.name,
-        phone: confirmed.phone,
-        addr: confirmed.addr || '',
-        addr_detail: confirmed.addr_detail || ''
+        name: userData?.name || '고객',
+        phone: userData?.phone || '',
+        addr: '',
+        addr_detail: ''
       },
       order_details: {
         payment_link_code: linkCode,
@@ -751,91 +730,3 @@ if (document.readyState === 'loading') {
 }
 console.log('[payment_link_functions.js] 파일 로드 완료 - loadPaymentLinks, showCreatePaymentLinkForm 함수 사용 가능');
 window._paymentLinkFunctionsLoaded = true;
-
-// ==================== 배송정보 확인 팝업 ====================
-function showDeliveryConfirmation(link, userData, memoParsed) {
-  return new Promise((resolve) => {
-    const overlay = document.createElement('div');
-    overlay.style.cssText = `
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0, 0, 0, 0.5); display: flex;
-      align-items: center; justify-content: center; z-index: 9999;
-    `;
-
-    const modal = document.createElement('div');
-    modal.style.cssText = `
-      max-width: 600px; width: 90%; padding: 40px 30px;
-      background: white; border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-    `;
-
-    const defaultName = userData?.name || link.customer_name || '';
-    const defaultPhone = userData?.phone || link.customer_phone || '';
-
-    modal.innerHTML = `
-      <h2 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 900; color: #0f172a;">배송정보 확인</h2>
-      <p style="margin: 0 0 30px 0; font-size: 14px; color: #64748b;">정보를 확인 후 결제를 진행합니다</p>
-
-      <div style="background: #f9fafb; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-        <div style="display: grid; gap: 15px;">
-          <div>
-            <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase;">상품명</label>
-            <input type="text" value="${link.product_name}" disabled style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #e2e8f0; color: #0f172a; font-weight: 600;">
-          </div>
-          <div>
-            <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase;">결제금액</label>
-            <input type="text" value="${(link.price || 0).toLocaleString()}원" disabled style="width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: #e2e8f0; color: #10b981; font-weight: 700; font-size: 16px;">
-          </div>
-        </div>
-      </div>
-
-      <div style="background: linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%); border: 1px solid #fed7aa; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
-        <h3 style="margin: 0 0 15px 0; font-size: 14px; font-weight: 700; color: #0f172a;">📦 배송 정보</h3>
-        <div style="display: grid; gap: 15px;">
-          <div>
-            <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase;">고객명</label>
-            <input type="text" id="delivery-name" value="${defaultName}" style="width: 100%; padding: 10px; border: 1px solid #fed7aa; border-radius: 8px; color: #0f172a; font-weight: 600; background: white;" readonly>
-            <p style="margin: 6px 0 0 0; font-size: 11px; color: #92400e;">고객명은 로그인 정보로 자동 입력됩니다</p>
-          </div>
-          <div>
-            <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase;">전화번호</label>
-            <input type="tel" id="delivery-phone" value="${defaultPhone}" style="width: 100%; padding: 10px; border: 1px solid #fed7aa; border-radius: 8px; color: #0f172a; font-weight: 600; background: white;" readonly>
-            <p style="margin: 6px 0 0 0; font-size: 11px; color: #92400e;">전화번호는 로그인 정보로 자동 입력됩니다</p>
-          </div>
-          <div>
-            <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase;">배송 주소 (선택사항)</label>
-            <input type="text" id="delivery-addr" placeholder="주소를 입력하세요 (선택)" style="width: 100%; padding: 10px; border: 1px solid #fed7aa; border-radius: 8px; color: #0f172a; background: white;">
-          </div>
-          <div>
-            <label style="display: block; font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 6px; text-transform: uppercase;">상세 주소 (선택사항)</label>
-            <input type="text" id="delivery-addr-detail" placeholder="상세 주소를 입력하세요 (선택)" style="width: 100%; padding: 10px; border: 1px solid #fed7aa; border-radius: 8px; color: #0f172a; background: white;">
-          </div>
-        </div>
-      </div>
-
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <button id="confirm-delivery" style="padding: 14px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: 700; font-size: 16px; cursor: pointer;">결제 진행</button>
-        <button id="cancel-delivery" style="padding: 14px; background: #e2e8f0; color: #475569; border: 1px solid #cbd5e1; border-radius: 8px; font-weight: 600; font-size: 16px; cursor: pointer;">취소</button>
-      </div>
-    `;
-
-    overlay.appendChild(modal);
-    document.body.appendChild(overlay);
-
-    document.getElementById('confirm-delivery').onclick = () => {
-      const result = {
-        name: document.getElementById('delivery-name').value,
-        phone: document.getElementById('delivery-phone').value,
-        addr: document.getElementById('delivery-addr').value,
-        addr_detail: document.getElementById('delivery-addr-detail').value
-      };
-      overlay.remove();
-      resolve(result);
-    };
-
-    document.getElementById('cancel-delivery').onclick = () => {
-      overlay.remove();
-      resolve(null);
-    };
-  });
-}
