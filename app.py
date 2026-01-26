@@ -317,13 +317,15 @@ def payment_complete_close():
     <script>
         console.log('[payment_complete_close] 페이지 로드됨');
         
-        // 부모 창에 신호 전송
-        if (window.opener) {
-            console.log('[payment_complete_close] opener 감지됨 - 부모 창에 신호 전송');
+        // 부모 창에 "팝업 닫아달라" 신호 전송
+        if (window.opener && !window.opener.closed) {
+            console.log('[payment_complete_close] opener 감지됨 - 팝업 종료 신호 전송');
             try {
+                // 1. 부모 창에 payappWindow 변수 초기화 신호 (monitorPaymentWindow 중지)
                 window.opener.postMessage({
                     type: 'payment_completed_from_payapp',
-                    message: 'PayApp에서 결제 완료됨'
+                    message: 'PayApp에서 결제 완료됨',
+                    closePopup: true
                 }, '*');
                 console.log('[payment_complete_close] 신호 전송 완료');
             } catch (e) {
@@ -331,26 +333,34 @@ def payment_complete_close():
             }
         }
         
-        // 즉시 팝업 닫기 (여러 방법 동시에 시도)
+        // 2. 팝업 자신을 종료하려고 시도 (작동 보장 불가)
         function closeWindow() {
             try {
                 window.close();
             } catch (e) {
-                console.log('[payment_complete_close] window.close() 실패:', e);
+                console.log('[payment_complete_close] window.close() 실패');
             }
         }
         
-        // 최대한 빨리 닫기
         closeWindow();
-        
-        // 혹시 닫지 못했을 경우 반복 시도
         setTimeout(closeWindow, 100);
-        setTimeout(closeWindow, 200);
-        setTimeout(closeWindow, 500);
-        setTimeout(closeWindow, 1000);
+        setTimeout(closeWindow, 300);
+        setTimeout(closeWindow, 700);
         
-        // 마지막 수단: 홈페이지로 리다이렉트 (닫기 실패 시)
+        // 3. 1초 후에도 안 닫혔으면 홈페이지로 강제 이동
         setTimeout(() => {
+            if (!window.closed) {
+                console.log('[payment_complete_close] 팝업 닫기 실패 - 홈페이지로 이동');
+                try {
+                    window.location.href = '/';
+                } catch (e) {}
+            }
+        }, 1500);
+    </script>
+</body>
+</html>'''
+    
+    return html
             if (!window.closed) {
                 console.log('[payment_complete_close] 창 닫기 실패 - 홈페이지로 이동');
                 window.location.href = '/';
@@ -565,8 +575,11 @@ def get_quote(current_user, quote_id):
 @app.route('/api/orders', methods=['GET'])
 @token_required
 def get_orders(current_user):
-    # [Fix] completed 상태인 주문만 반환 (pending은 숨김)
-    orders = Order.query.filter_by(user_db_id=current_user.id, status='completed').order_by(Order.created_at.desc()).all()
+    # [Fix] completed 이상의 모든 주문 반환 (pending은 제외, 환불 요청 포함)
+    # 상태: completed(결제완료), preparing, shipping, delivered, refund_requested, refunded, cancelled
+    orders = Order.query.filter_by(user_db_id=current_user.id).filter(
+        Order.status != 'pending'  # pending만 제외
+    ).order_by(Order.created_at.desc()).all()
     
     return jsonify({'success': True, 'orders': [o.to_dict() for o in orders]})
 

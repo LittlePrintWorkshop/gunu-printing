@@ -3726,15 +3726,14 @@ function monitorPaymentWindow(payappWindow) {
               await clearCartEverywhere();
               console.log('[monitorPaymentWindow] ✅ 장바구니 비움');
               
-              // [Fix] 팝업 강제 종료 시도 (여러 방법 시도)
+              // [Fix] 팝업 강제 종료 시도
               try {
                 if (payappWindow && !payappWindow.closed) {
-                  console.log('[monitorPaymentWindow] 팝업 강제 종료 시도 중...');
+                  console.log('[monitorPaymentWindow] 팝업 강제 종료 시도 (1차)');
                   payappWindow.close();
-                  console.log('[monitorPaymentWindow] ✅ 팝업 종료 완료');
                 }
               } catch (e) {
-                console.log('[monitorPaymentWindow] 팝업 종료 시도 (크로스 도메인):', e.message);
+                console.log('[monitorPaymentWindow] 팝업 종료 실패 (크로스 도메인):', e.message);
               }
               
               // returnUrl로 리다이렉트하도록 신호 전송 (이미 PayApp이 처리할 것)
@@ -3746,6 +3745,16 @@ function monitorPaymentWindow(payappWindow) {
                 `주문번호: ${order.order_code || order.order_id}`,
                 true  // isComplete = true
               );
+              
+              // [Fix] 팝업 재종료 시도 (강제 종료)
+              setTimeout(() => {
+                try {
+                  if (payappWindow && !payappWindow.closed) {
+                    console.log('[monitorPaymentWindow] 팝업 강제 종료 시도 (2차)');
+                    payappWindow.close();
+                  }
+                } catch (e) {}
+              }, 500);
               
               // 2초 후 숨기고 홈으로 이동
               setTimeout(() => {
