@@ -4506,7 +4506,12 @@ async function submitOrder() {
     created_at: new Date().toISOString()
   };
   localStorage.setItem('tempOrder', JSON.stringify(tempOrderData));
-  console.log('[submitOrder] 임시 주문 데이터 저장:', tempOrderData);
+  console.log('[submitOrder] 임시 주문 데이터 저장 완료:', {
+    itemCount: cart.length,
+    totalPrice: finalPrice,
+    hasItems: !!tempOrderData.items,
+    cartItems: cart.map(item => ({name: item.name, qty: item.qty, price: item.price}))
+  });
 
   // 결제 실행
   startPayment(finalPrice, user);
@@ -4630,7 +4635,14 @@ async function onPaymentComplete(paymentResult) {
 
   // 임시 주문 정보 가져오기 (결제링크용 + 일반주문용 + 직주문용 모두 확인)
   let tempOrderForAPI = JSON.parse(localStorage.getItem('tempOrder') || '{}');
-  if (!tempOrderForAPI.items || tempOrderForAPI.items.length === 0) {
+  console.log('[onPaymentComplete] tempOrder 확인:', {
+    hasItems: !!tempOrderForAPI.items,
+    itemsType: typeof tempOrderForAPI.items,
+    itemsLength: Array.isArray(tempOrderForAPI.items) ? tempOrderForAPI.items.length : 'N/A'
+  });
+  
+  if (!tempOrderForAPI.items || (Array.isArray(tempOrderForAPI.items) && tempOrderForAPI.items.length === 0)) {
+    console.log('[onPaymentComplete] tempOrder에 items 없음, 다른 소스 확인...');
     // 결제링크에서 온 경우
     const paymentLinkOrder = JSON.parse(localStorage.getItem('tempPaymentLinkOrder') || '{}');
     if (paymentLinkOrder.items && paymentLinkOrder.items.length > 0) {
@@ -4701,7 +4713,15 @@ async function onPaymentComplete(paymentResult) {
       await clearCartEverywhere();
       
       // [Fix] 주문 완료 페이지로 이동 - 서버 응답 데이터 전체 전달
+      console.log('[onPaymentComplete] 서버 응답 받음 (성공):', {
+        success: result.success,
+        orderId: result.order_id,
+        orderCode: result.order_code,
+        itemCount: result.items ? result.items.length : 0,
+        totalPrice: result.total_price
+      });
       showOrderComplete(result);
+      console.log('[onPaymentComplete] showOrderComplete() 호출 완료');
     } else {
       alert('주문 처리에 실패했습니다: ' + (result.message || ''));
     }
@@ -4713,12 +4733,22 @@ async function onPaymentComplete(paymentResult) {
 
 // [Fix] 주문 완료 페이지 표시 - 서버 응답 데이터 전체 받기
 function showOrderComplete(orderResult) {
+  console.log('[showOrderComplete] 호출됨 - 전달된 데이터:', orderResult);
+  
   // 서버 응답에서 필요한 정보 추출
   const orderId = orderResult.order_id;
   const orderCode = orderResult.order_code || orderResult.order_id;
   const totalPrice = orderResult.total_price || 0;
   const mulNo = orderResult.mul_no; // 거래번호
   const payType = orderResult.pay_type; // 결제방식
+  
+  console.log('[showOrderComplete] 추출된 정보:', {
+    orderId,
+    orderCode,
+    totalPrice,
+    mulNo,
+    payType
+  });
   
   const completeHtml = `
     <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000;">
