@@ -4602,6 +4602,10 @@ async function startPayment(totalAmount, user) {
 
 // 결제 완료 후 콜백 (PayApp에서 호출)
 async function onPaymentComplete(paymentResult) {
+  // [Fix] 결제 완료 플래그 설정 - monitorPaymentWindow가 tempOrder를 삭제하지 않도록 함
+  window.paymentCompleted = true;
+  console.log('[onPaymentComplete] ✅ 결제 완료 플래그 설정됨 - monitorPaymentWindow가 tempOrder 삭제 차단');
+  
   console.log('🔍 결제 완료 전체 응답:', paymentResult);
   console.log('🔍 mul_no:', paymentResult.mul_no);
   console.log('🔍 pay_type:', paymentResult.pay_type);
