@@ -3615,9 +3615,9 @@ function monitorPaymentWindow(payappWindow) {
         sessionStorage.removeItem('pendingOrderId');
         sessionStorage.removeItem('pendingPaymentLinkOrderId');
         
-        // ✅ onPaymentComplete가 실행될 시간을 주기 위해 500ms 대기
+        // ✅ onPaymentComplete가 실행될 시간을 주기 위해 1500ms 대기
         // 그 후 tempOrder.mul_no를 다시 확인
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1500));
         
         const tempOrder = JSON.parse(localStorage.getItem('tempOrder') || '{}');
         console.log('[monitorPaymentWindow] 500ms 대기 후 tempOrder.mul_no:', tempOrder.mul_no);

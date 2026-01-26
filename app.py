@@ -1067,6 +1067,42 @@ def cancel_user_order(current_user, order_id):
         'order': order.to_dict()
     })
 
+@app.route('/api/orders/<order_id>', methods=['PUT'])
+@token_required
+def update_order_payment(current_user, order_id):
+    """주문의 결제 정보 업데이트 (mul_no, pay_type 등)"""
+    print(f"[PUT /api/orders/{order_id}] 요청 사용자: {current_user.id}")
+    
+    order = Order.query.filter_by(order_id=order_id).first()
+    if not order:
+        print(f"[PUT] 주문을 찾을 수 없음: {order_id}")
+        return jsonify({'success': False, 'message': '주문을 찾을 수 없습니다.'}), 404
+    
+    # 현재 사용자의 주문인지 확인
+    if order.user_db_id != current_user.id:
+        print(f"[PUT] 권한 없음: 요청자={current_user.id}, 주문자={order.user_db_id}")
+        return jsonify({'success': False, 'message': '다른 사용자의 주문은 수정할 수 없습니다.'}), 403
+    
+    data = request.json
+    
+    # mul_no, pay_type 업데이트
+    if 'mul_no' in data:
+        order.mul_no = data['mul_no']
+        print(f"[PUT] mul_no 업데이트: {data['mul_no']}")
+    
+    if 'pay_type' in data:
+        order.pay_type = data['pay_type']
+        print(f"[PUT] pay_type 업데이트: {data['pay_type']}")
+    
+    db.session.commit()
+    print(f"[PUT] ✅ 주문 정보 업데이트 완료: {order_id}")
+    
+    return jsonify({
+        'success': True,
+        'message': '주문이 업데이트되었습니다.',
+        'order_id': order_id
+    })
+
 @app.route('/api/orders/<order_id>', methods=['DELETE'])
 @token_required
 def delete_user_order(current_user, order_id):
