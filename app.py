@@ -1115,8 +1115,8 @@ def update_order_payment(current_user, order_id):
 # [Fix] PATCH: 결제 완료 후 상태 업데이트
 @app.route('/api/orders/<order_id>', methods=['PATCH'])
 @token_required
-def update_order_status(current_user, order_id):
-    """주문 상태 업데이트 (pending → completed)"""
+def update_order_status_on_payment(current_user, order_id):
+    """주문 상태 업데이트 (pending → completed) - 결제 완료 시"""
     print(f"[PATCH /api/orders/{order_id}] 요청 사용자: {current_user.id}")
     
     order = Order.query.filter_by(order_id=order_id).first()
