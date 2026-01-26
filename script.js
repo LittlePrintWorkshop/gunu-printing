@@ -3621,12 +3621,18 @@ function monitorPaymentWindow(payappWindow) {
               
               console.log('[monitorPaymentWindow] 응답 상태:', deleteRes.status);
               const deleteData = await deleteRes.json();
-              console.log('[monitorPaymentWindow] 응답 데이터:', deleteData);
+              console.log('[monitorPaymentWindow] 응답 데이터:', JSON.stringify(deleteData, null, 2));
               
               if (deleteRes.ok && deleteData.success) {
                 console.log('[monitorPaymentWindow] ✅ 주문 삭제 완료');
               } else {
                 console.error('[monitorPaymentWindow] ❌ 주문 삭제 실패:', deleteRes.status, deleteData.message);
+                console.error('[monitorPaymentWindow] 상세:', {
+                  status: deleteData.order_status,
+                  mul_no: deleteData.mul_no,
+                  is_unpaid: deleteData.is_unpaid,
+                  is_cancelled: deleteData.is_cancelled
+                });
               }
             } catch (e) {
               console.error('[monitorPaymentWindow] 🔴 주문 삭제 오류:', e);
