@@ -1051,10 +1051,10 @@ def update_order_status(current_user, order_id):
         'order': order.to_dict()
     })
 
-@app.route('/api/orders/<order_id>/cancel', methods=['PUT'])
+@app.route('/api/orders/<order_id>/cancel', methods=['PUT', 'POST'])
 @token_required
 def cancel_user_order(current_user, order_id):
-    """사용자가 자신의 주문을 취소"""
+    """사용자가 자신의 주문을 취소 또는 삭제"""
     order = Order.query.filter_by(order_id=order_id).first()
     if not order:
         return jsonify({'success': False, 'message': '주문을 찾을 수 없습니다.'}), 404
@@ -1063,18 +1063,29 @@ def cancel_user_order(current_user, order_id):
     if order.user_db_id != current_user.id:
         return jsonify({'success': False, 'message': '다른 사용자의 주문은 취소할 수 없습니다.'}), 403
     
-    # 대기 중인 주문만 취소 가능
-    if order.status != 'pending':
-        return jsonify({'success': False, 'message': '대기 중인 주문만 취소할 수 있습니다.'}), 400
-    
-    order.status = 'cancelled'
-    db.session.commit()
-    
-    return jsonify({
-        'success': True,
-        'message': '주문이 취소되었습니다.',
-        'order': order.to_dict()
-    })
+    # [Fix] 결제 미완료(pending) 상태면 삭제, 아니면 취소 상태로 변경
+    if order.status == 'pending':
+        # pending 상태면 DELETE처럼 처리
+        db.session.delete(order)
+        db.session.commit()
+        print(f"[cancel_user_order] ✅ 미결제 주문 삭제 완료: {order_id}")
+        return jsonify({
+            'success': True,
+            'message': '결제 미완료 주문이 삭제되었습니다.',
+            'order_id': order_id
+        })
+    elif order.status == 'cancelled':
+        return jsonify({'success': False, 'message': '이미 취소된 주문입니다.'}), 400
+    else:
+        # 다른 상태면 취소 처리
+        order.status = 'cancelled'
+        db.session.commit()
+        print(f"[cancel_user_order] ✅ 주문 취소 완료: {order_id}")
+        return jsonify({
+            'success': True,
+            'message': '주문이 취소되었습니다.',
+            'order': order.to_dict()
+        })
 
 @app.route('/api/orders/<order_id>', methods=['PUT'])
 @token_required

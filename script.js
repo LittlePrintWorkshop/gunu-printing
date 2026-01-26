@@ -3666,131 +3666,46 @@ function monitorPaymentWindow(payappWindow) {
           false
         );
         
-        // [Fix] 신호 도착까지 계속 폴링 (고정 3초가 아님)
+        // [Fix] 팝업 닫힘 신호를 서버로 전송 (서버가 처리하도록)
         const deleteOrderId = sessionStorage.getItem('pendingOrderId') ||
                               sessionStorage.getItem('pendingPaymentLinkOrderId');
-        console.log('[monitorPaymentWindow] 미결제 주문ID:', deleteOrderId);
+        console.log('[monitorPaymentWindow] 팝업 닫힘 - 주문ID:', deleteOrderId);
         
-        let orderHasMulNo = false;
-        let pollCount = 0;
-        const maxPolls = 120; // 최대 120번 (60초 × 2 = 2분 등)
-        const pollInterval = 500; // 500ms마다 확인
-        
-        // 신호 도착까지 계속 폴링
-        const pollCheckInterval = setInterval(async () => {
-          pollCount++;
-          
-          if (deleteOrderId && pollCount <= maxPolls) {
-            try {
-              const token = getToken();
-              const checkRes = await fetch(`/api/orders/${deleteOrderId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-              });
-
-              if (checkRes.ok) {
-                const checkData = await checkRes.json();
-                const order = checkData.order || checkData;
-                
-                if (order && order.mul_no && order.pay_type) {
-                  orderHasMulNo = true;
-                  console.log('[monitorPaymentWindow] ✅ 신호 도착! mul_no=', order.mul_no);
-                  clearInterval(pollCheckInterval);
-                  
-                  // [Fix] 결제 완료 메시지 표시
-                  updatePaymentProcessingMessage(
-                    '✅ 결제가 완료되었습니다!',
-                    '주문을 처리하는 중입니다...',
-                    true
-                  );
-                  
-                  // [Fix] 결제 완료 시 주문 상태를 completed로 업데이트
-                  try {
-                    const updateRes = await fetch(`/api/orders/${deleteOrderId}`, {
-                      method: 'PATCH',
-                      headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                      },
-                      body: JSON.stringify({ status: 'completed' })
-                    });
-
-                    if (updateRes.ok) {
-                      console.log('[monitorPaymentWindow] ✅ 주문 상태 completed로 업데이트 완료');
-                    }
-                  } catch (e) {
-                    console.error('[monitorPaymentWindow] 주문 상태 업데이트 중 오류:', e);
-                  }
-
-                  // [Fix] 2초 후 완료 화면 표시 및 모래시계 종료
-                  await new Promise(resolve => setTimeout(resolve, 2000));
-                  hidePaymentProcessing();
-                  showOrderComplete({
-                    order_id: deleteOrderId,
-                    order_code: deleteOrderId
-                  });
-                  
-                  return;
-                }
-              }
-            } catch (e) {
-              console.log('[monitorPaymentWindow] 폴링 확인 오류:', e.message);
-            }
-          } else if (pollCount > maxPolls) {
-            // 타임아웃 (120번 × 500ms = 60초)
-            console.log('[monitorPaymentWindow] 폴링 타임아웃 - 결제 확인 실패');
-            clearInterval(pollCheckInterval);
-            hidePaymentProcessing();
-            alert('결제 처리 중에 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
-          }
-        }, pollInterval);
-        
-        // [Fix] 폴링 종료 후 결제 미완료 처리
-        // pollCheckInterval이 끝나면 자동으로 진행
-        const checkCompletionInterval = setInterval(async () => {
-          // pollCheckInterval이 끝났는지 확인
-          // (pollCheckInterval이 clear되었으면 진행)
-          if (!orderHasMulNo && pollCount > maxPolls) {
-            clearInterval(checkCompletionInterval);
+        // 서버에 결제 취소 신호 전송
+        if (deleteOrderId) {
+          try {
+            const token = getToken();
+            console.log('[monitorPaymentWindow] 서버로 결제 취소 신호 전송...');
             
-            console.log('[monitorPaymentWindow] 결제 미완료 - 주문 삭제:', deleteOrderId);
-            hidePaymentProcessing();
+            const cancelRes = await fetch(`/api/orders/${deleteOrderId}/cancel`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
 
-            try {
-              const token = getToken();
-              console.log('[monitorPaymentWindow] 결제 취소: 주문 삭제 시작...');
+            const cancelData = await cancelRes.json();
+            console.log('[monitorPaymentWindow] 취소 응답:', cancelData);
 
-              const deleteRes = await fetch(`/api/orders/${deleteOrderId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-              });
-
-              console.log('[monitorPaymentWindow] 삭제 응답 상태:', deleteRes.status);
-              const deleteData = await deleteRes.json();
-              console.log('[monitorPaymentWindow] 삭제 응답 데이터:', JSON.stringify(deleteData, null, 2));
-
-              if (deleteRes.ok && deleteData.success) {
-                console.log('[monitorPaymentWindow] ✅ 미결제 주문 삭제 완료');
-                alert('결제가 취소되었습니다.');
-              } else {
-                console.error('[monitorPaymentWindow] 미결제 주문 삭제 실패:', deleteRes.status, deleteData.message);
-                alert('주문 취소 처리 중 오류가 발생했습니다.');
-              }
-            } catch (e) {
-              console.error('[monitorPaymentWindow] 주문 삭제 중 오류:', e);
-              alert('주문 취소 처리 중 오류가 발생했습니다.');
+            if (cancelRes.ok && cancelData.success) {
+              console.log('[monitorPaymentWindow] ✅ 주문 취소 처리 완료');
+              hidePaymentProcessing();
+              alert('결제가 취소되었습니다.');
+            } else {
+              console.error('[monitorPaymentWindow] 취소 처리 실패:', cancelData.message);
+              hidePaymentProcessing();
+              alert('결제 처리 중 오류가 발생했습니다.');
             }
-            
-            // sessionStorage 정리
-            sessionStorage.removeItem('pendingOrderId');
-            sessionStorage.removeItem('pendingPaymentLinkOrderId');
+          } catch (e) {
+            console.error('[monitorPaymentWindow] 취소 신호 전송 중 오류:', e);
+            hidePaymentProcessing();
+            alert('결제 처리 중 오류가 발생했습니다.');
           }
-        }, 500);
+        } else {
+          hidePaymentProcessing();
+        }
         
-        // 5분 후 자동 정리 (방어)
-        setTimeout(() => {
-          clearInterval(pollCheckInterval);
-          clearInterval(checkCompletionInterval);
-        }, 5 * 60 * 1000);
+        // sessionStorage 정리
+        sessionStorage.removeItem('pendingOrderId');
+        sessionStorage.removeItem('pendingPaymentLinkOrderId');
       }
     } catch (error) {
       console.log('[monitorPaymentWindow] 팝업 상태 확인 오류:', error.message);
