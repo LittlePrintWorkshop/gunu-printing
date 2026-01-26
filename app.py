@@ -1075,12 +1075,18 @@ def delete_user_order(current_user, order_id):
     - 결제 미완료 (mul_no 없음): 바로 삭제 가능
     - 취소된 주문: 삭제 가능
     """
+    print(f"[DELETE /api/orders/{order_id}] 요청 사용자: {current_user.id}")
+    
     order = Order.query.filter_by(order_id=order_id).first()
     if not order:
+        print(f"[DELETE] 주문을 찾을 수 없음: {order_id}")
         return jsonify({'success': False, 'message': '주문을 찾을 수 없습니다.'}), 404
+    
+    print(f"[DELETE] 주문 정보 - status: {order.status}, mul_no: {order.mul_no}, user_db_id: {order.user_db_id}, current_user.id: {current_user.id}")
     
     # 현재 사용자의 주문인지 확인
     if order.user_db_id != current_user.id:
+        print(f"[DELETE] 권한 없음: 요청자={current_user.id}, 주문자={order.user_db_id}")
         return jsonify({'success': False, 'message': '다른 사용자의 주문은 삭제할 수 없습니다.'}), 403
     
     # 삭제 가능한 경우:
@@ -1089,16 +1095,22 @@ def delete_user_order(current_user, order_id):
     is_unpaid = not order.mul_no and order.status == 'pending'
     is_cancelled = order.status == 'cancelled'
     
+    print(f"[DELETE] 삭제 가능 여부 - is_unpaid: {is_unpaid}, is_cancelled: {is_cancelled}")
+    
     if not (is_unpaid or is_cancelled):
+        print(f"[DELETE] 삭제 불가능: status={order.status}, mul_no={order.mul_no}")
         return jsonify({
             'success': False, 
             'message': '결제 미완료 또는 취소된 주문만 삭제할 수 있습니다.',
             'order_status': order.status,
-            'mul_no': order.mul_no
+            'mul_no': order.mul_no,
+            'is_unpaid': is_unpaid,
+            'is_cancelled': is_cancelled
         }), 400
     
     db.session.delete(order)
     db.session.commit()
+    print(f"[DELETE] ✅ 주문 삭제 완료: {order_id}")
     
     return jsonify({
         'success': True,
