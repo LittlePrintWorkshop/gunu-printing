@@ -200,9 +200,8 @@ async function finalizeOrderById(orderId, retryCount = 0) {
       renderCartView();
     }
 
-    const orderCode = order.order_code || order.order_id || order.id;
-    const totalPrice = order.total_price || 0;
-    showOrderComplete(order.id || orderId, orderCode, totalPrice);
+    // [Fix] order 객체 전체 전달
+    showOrderComplete(order);
   } catch (e) {
     console.error('주문 조회 중 오류:', e);
     hidePaymentProcessing();
@@ -3469,7 +3468,12 @@ async function orderDirectlyFromQuote() {
     const orderId = 'OLOCAL-' + Date.now();
     localStorage.setItem('lastOrderId', orderId);
     await clearCartEverywhere();
-    showOrderComplete(orderId, orderId, finalPrice);
+    // [Fix] 테스트 모드도 객체 형식으로 전달
+    showOrderComplete({
+      order_id: orderId,
+      order_code: orderId,
+      total_price: finalPrice
+    });
     return;
   }
 
@@ -3648,7 +3652,12 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   if (isLocalEnv) {
     toast('테스트 모드: 결제 없이 주문 완료 처리');
     await clearCartEverywhere();
-    showOrderComplete(orderId, orderId, totalAmount);
+    // [Fix] 테스트 모드도 객체 형식으로 전달
+    showOrderComplete({
+      order_id: orderId,
+      order_code: orderId,
+      total_price: totalAmount
+    });
     return;
   }
 
@@ -4338,7 +4347,12 @@ async function submitOrder() {
     const orderId = 'OLOCAL-' + Date.now();
     localStorage.setItem('lastOrderId', orderId);
     await clearCartEverywhere();
-    showOrderComplete(orderId, orderId, totalPrice + totalShipping);
+    // [Fix] 테스트 모드도 객체 형식으로 전달
+    showOrderComplete({
+      order_id: orderId,
+      order_code: orderId,
+      total_price: totalPrice + totalShipping
+    });
     return;
   }
   if (!user) return alert('로그인이 필요합니다.');
@@ -4519,7 +4533,12 @@ async function startPayment(totalAmount, user) {
   if (isLocalEnv) {
     toast('테스트 모드: 결제 없이 주문 완료 처리');
     await clearCartEverywhere();
-    showOrderComplete(orderId, orderId, totalAmount);
+    // [Fix] 테스트 모드도 객체 형식으로 전달
+    showOrderComplete({
+      order_id: orderId,
+      order_code: orderId,
+      total_price: totalAmount
+    });
     return;
   }
 
@@ -4676,8 +4695,8 @@ async function onPaymentComplete(paymentResult) {
       localStorage.removeItem('tempPaymentLinkOrder'); // 결제링크 임시 데이터도 정리
       await clearCartEverywhere();
       
-      // 주문 완료 페이지로 이동
-      showOrderComplete(orderId, orderCode, tempOrderForAPI.total_price);
+      // [Fix] 주문 완료 페이지로 이동 - 서버 응답 데이터 전체 전달
+      showOrderComplete(result);
     } else {
       alert('주문 처리에 실패했습니다: ' + (result.message || ''));
     }
@@ -4687,8 +4706,15 @@ async function onPaymentComplete(paymentResult) {
   }
 }
 
-// 주문 완료 페이지 표시
-function showOrderComplete(orderId, orderCode, totalPrice) {
+// [Fix] 주문 완료 페이지 표시 - 서버 응답 데이터 전체 받기
+function showOrderComplete(orderResult) {
+  // 서버 응답에서 필요한 정보 추출
+  const orderId = orderResult.order_id;
+  const orderCode = orderResult.order_code || orderResult.order_id;
+  const totalPrice = orderResult.total_price || 0;
+  const mulNo = orderResult.mul_no; // 거래번호
+  const payType = orderResult.pay_type; // 결제방식
+  
   const completeHtml = `
     <div style="position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:10000;">
       <div style="max-width:500px; width:90%; padding:40px; text-align:center; background:white; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,0.2);">
@@ -4703,6 +4729,7 @@ function showOrderComplete(orderId, orderCode, totalPrice) {
           <div style="font-size:22px; font-weight:bold; color:#0f172a; font-family:'Courier New', monospace; margin-bottom:20px; letter-spacing:1px;">${orderCode}</div>
           <div style="font-size:13px; color:#64748b; margin-bottom:10px; font-weight:600;">결제금액</div>
           <div style="font-size:22px; font-weight:bold; color:#10b981;">${(totalPrice || 0).toLocaleString()}원</div>
+          ${mulNo ? `<div style="margin-top:20px; padding-top:20px; border-top:1px solid #e2e8f0; font-size:12px; color:#94a3b8;">거래번호: ${mulNo}</div>` : ''}
         </div>
         <button onclick="goHome()" style="width:100%; padding:14px; background:#10b981; color:white; border:none; border-radius:8px; font-weight:700; font-size:16px; cursor:pointer; margin-bottom:10px; transition:background 0.3s;">확인</button>
         <button onclick="goOrderHistory()" style="width:100%; padding:12px; background:#f1f5f9; color:#0f172a; border:none; border-radius:8px; font-weight:600; font-size:14px; cursor:pointer; transition:background 0.3s;">주문 조회하기</button>
@@ -4718,6 +4745,12 @@ function showOrderComplete(orderId, orderCode, totalPrice) {
   `;
   
   const mainContent = document.querySelector('.main-content');
+  if (mainContent) {
+    mainContent.innerHTML = completeHtml;
+    mainContent.style.display = 'block';
+    document.querySelectorAll('[id^="view-"]').forEach(el => el.style.display = 'none');
+  }
+}
   if (mainContent) {
     mainContent.innerHTML = completeHtml;
     mainContent.style.display = 'block';
