@@ -358,8 +358,8 @@ def static_files(path):
     if path.startswith('api/'):
         return '', 404
     
-    # [Fix] 특정 API 라우트는 처리하지 않음
-    if path in ['payment-complete-close', 'login', 'signup']:
+    # [Fix] 특정 라우트는 처리하지 않음 (Flask가 처리하도록)
+    if path in ['login', 'signup']:
         return '', 404
     
     # JavaScript 파일의 MIME type을 명시적으로 설정
