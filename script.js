@@ -3604,8 +3604,9 @@ function monitorPaymentWindow(payappWindow) {
           console.log('[monitorPaymentWindow] 결제 미완료 - 팝업만 닫힘');
           hidePaymentProcessing();
           
-          // 임시 저장된 주문ID 확인
-          const pendingOrderId = sessionStorage.getItem('pendingPaymentLinkOrderId');
+          // 임시 저장된 주문ID 확인 (개인결제링크 또는 일반 주문 모두 대응)
+          let pendingOrderId = sessionStorage.getItem('pendingOrderId') || 
+                                sessionStorage.getItem('pendingPaymentLinkOrderId');
           if (pendingOrderId) {
             console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', pendingOrderId);
             try {
@@ -3621,6 +3622,7 @@ function monitorPaymentWindow(payappWindow) {
             } catch (e) {
               console.error('[monitorPaymentWindow] 주문 삭제 실패:', e);
             }
+            sessionStorage.removeItem('pendingOrderId');
             sessionStorage.removeItem('pendingPaymentLinkOrderId');
           }
           
@@ -3687,6 +3689,7 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
+    'goodname': '직주문',
     'price': totalAmount.toString(),
     'recvphone': user.phone || '01000000000',
     'memo': `고객: ${user.name}`,
@@ -3701,6 +3704,12 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
 
   // 결제중 상태 표시
   showPaymentProcessing();
+  
+  // 결제 취소 시 삭제할 수 있도록 임시 저장 (일반 주문)
+  if (orderId) {
+    sessionStorage.setItem('pendingOrderId', orderId);
+    console.log('[startPaymentDirectOrder] 생성된 주문ID 저장:', orderId);
+  }
   
   // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
   // 미리 팝업을 열고 PayApp이 그 안에 결제 페이지를 로드하도록 함
@@ -4587,6 +4596,12 @@ async function startPayment(totalAmount, user, orderId) {
 
   // 결제중 상태 표시
   showPaymentProcessing();
+  
+  // 결제 취소 시 삭제할 수 있도록 임시 저장 (장바구니 주문)
+  if (orderId) {
+    sessionStorage.setItem('pendingOrderId', orderId);
+    console.log('[startPayment] 생성된 주문ID 저장:', orderId);
+  }
   
   // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
   const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
