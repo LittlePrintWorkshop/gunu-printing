@@ -3497,8 +3497,7 @@ async function orderDirectlyFromQuote() {
     date: new Date().toLocaleString()
   };
 
-  // [Fix] 결제 완료 후에만 주문을 최종 생성하도록 변경
-  // 임시 주문 데이터를 localStorage에 저장 (결제 완료 후 서버에 전송)
+  // 임시 주문 데이터 생성
   const tempDirectOrderData = {
     items: [orderItem],
     total_price: finalPrice,
@@ -3511,7 +3510,6 @@ async function orderDirectlyFromQuote() {
     order_details: orderDetails,
     created_at: new Date().toISOString()
   };
-  localStorage.setItem('tempDirectOrder', JSON.stringify(tempDirectOrderData));
   
   console.log('[orderDirectlyFromQuote] 카테고리 직주문 - qty 데이터 형식:', {
     qtyVariable: qty,
@@ -3521,8 +3519,16 @@ async function orderDirectlyFromQuote() {
   });
   console.log('[orderDirectlyFromQuote] 임시 직주문 데이터 저장:', tempDirectOrderData);
 
-  // 결제 실행 (주문번호 없음 - 결제 완료 후 생성)
-  startPaymentDirectOrder(finalPrice, user);
+  // [Fix] localStorage에만 저장 (결제 완료 후 monitorPaymentWindow에서 서버에 저장)
+  localStorage.setItem('tempDirectOrder', JSON.stringify(tempDirectOrderData));
+  
+  // [Fix] 클라이언트에서 orderId 생성 (sessionStorage에 저장 - monitorPaymentWindow에서 사용)
+  const clientOrderId = 'TEMP-' + Date.now();
+  sessionStorage.setItem('pendingOrderId', clientOrderId);
+  console.log('[orderDirectlyFromQuote] 클라이언트 임시주문ID 생성:', clientOrderId);
+
+  // 결제 실행 (orderId 포함)
+  startPaymentDirectOrder(finalPrice, user, clientOrderId);
   window._ordering = false;
 }
 
@@ -3703,7 +3709,7 @@ function monitorPaymentWindow(payappWindow) {
 }
 
 // 견적에서 바로주문 결제
-async function startPaymentDirectOrder(totalAmount, user) {
+async function startPaymentDirectOrder(totalAmount, user, orderId) {
   const host = window.location.hostname || '';
   const params = new URLSearchParams(window.location.search);
   const isLocalEnv = host === 'localhost'
@@ -3772,7 +3778,7 @@ async function startPaymentDirectOrder(totalAmount, user) {
     'redirectpay': '1',
     'returnurl': returnUrl,
     'feedbackurl': window.location.origin + '/api/payment-callback',
-    'var1': '', // [Fix] 결제 완료 후 주문 생성하므로 여기서는 비움
+    'var1': orderId || '', // [Fix] 주문번호
     'var2': user.user_id, // 사용자 아이디
     'skip_cstpage': 'y' // 매출전표 페이지 이동 안함
   });
@@ -3780,7 +3786,11 @@ async function startPaymentDirectOrder(totalAmount, user) {
   // 결제중 상태 표시
   showPaymentProcessing();
   
-  // [Fix] orderId 제거 - 결제 완료 후에만 주문 생성되므로 sessionStorage 저장 불필요
+  // [Fix] sessionStorage에 pendingOrderId 저장 (monitorPaymentWindow에서 mul_no 확인용)
+  if (orderId) {
+    sessionStorage.setItem('pendingOrderId', orderId);
+    console.log('[startPaymentDirectOrder] 미결제 주문ID 저장:', orderId);
+  }
   
   // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
   const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
@@ -4635,50 +4645,26 @@ async function submitOrder() {
     orderDetails.shipping.cost = totalShipping;
   }
 
-  // [Fix] 결제 전에 먼저 주문을 서버에 생성 (상태: 미결제)
-  // 팝업 닫힘 시 monitorPaymentWindow가 mul_no 확인해서 완료화면 표시
-  try {
-    const response = await fetch('/api/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
-      },
-      body: JSON.stringify({
-        items: cart,
-        total_price: finalPrice,
-        delivery_info: deliveryInfo,
-        order_details: orderDetails
-      })
-    });
+  // [Fix] localStorage에만 저장 (결제 완료 후 monitorPaymentWindow에서 서버에 저장)
+  const tempCartOrderData = {
+    items: cart,
+    total_price: finalPrice,
+    delivery_info: deliveryInfo,
+    order_details: orderDetails
+  };
+  localStorage.setItem('tempCartOrder', JSON.stringify(tempCartOrderData));
+  console.log('[submitOrder] ✅ 임시 장바구니 주문정보 저장 완료:', {
+    totalPrice: finalPrice,
+    itemCount: cart.length
+  });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[submitOrder] 주문 생성 실패:', response.status, errorText);
-      alert(`주문 생성 실패 (${response.status}): ${errorText}`);
-      return;
-    }
+  // [Fix] 클라이언트에서 orderId 생성 (sessionStorage에 저장 - monitorPaymentWindow에서 사용)
+  const clientOrderId = 'TEMP-' + Date.now();
+  sessionStorage.setItem('pendingOrderId', clientOrderId);
+  console.log('[submitOrder] 클라이언트 임시주문ID 생성:', clientOrderId);
 
-    const result = await response.json();
-    if (!result.success) {
-      console.error('[submitOrder] 주문 생성 실패:', result);
-      alert('주문 생성에 실패했습니다. 다시 시도해주세요.');
-      return;
-    }
-
-    const orderId = result.order_id;
-    console.log('[submitOrder] ✅ 주문 생성 완료:', {
-      orderId,
-      totalPrice: finalPrice,
-      itemCount: cart.length
-    });
-
-    // 결제 실행 (orderId 전달)
-    startPayment(finalPrice, user, orderId);
-  } catch (e) {
-    console.error('[submitOrder] 주문 생성 중 오류:', e);
-    alert('주문 생성 중 오류가 발생했습니다: ' + e.message);
-  }
+  // 결제 실행 (orderId 전달)
+  startPayment(finalPrice, user, clientOrderId);
 }
 
 // PayApp 결제 시작
