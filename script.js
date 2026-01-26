@@ -3616,53 +3616,68 @@ function monitorPaymentWindow(payappWindow) {
         sessionStorage.removeItem('pendingPaymentLinkOrderId');
         
         // ✅ onPaymentComplete가 실행될 시간을 주기 위해 1500ms 대기
-        // 그 후 tempOrder.mul_no를 다시 확인
         await new Promise(resolve => setTimeout(resolve, 1500));
         
-        const tempOrder = JSON.parse(localStorage.getItem('tempOrder') || '{}');
-        console.log('[monitorPaymentWindow] 500ms 대기 후 tempOrder.mul_no:', tempOrder.mul_no);
+        // ✅ 서버에서 직접 주문 정보를 조회 (가장 확실한 방법!)
+        let orderHasMulNo = false;
+        if (deleteOrderId) {
+          try {
+            const token = getToken();
+            const checkRes = await fetch(`/api/orders/${deleteOrderId}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (checkRes.ok) {
+              const checkData = await checkRes.json();
+              if (checkData.success && checkData.order && checkData.order.mul_no) {
+                orderHasMulNo = true;
+                console.log('[monitorPaymentWindow] ✅ 서버에서 확인: mul_no 있음 -', checkData.order.mul_no);
+              } else {
+                console.log('[monitorPaymentWindow] 서버에서 확인: mul_no 없음');
+              }
+            }
+          } catch (e) {
+            console.log('[monitorPaymentWindow] 서버 조회 오류 (진행):', e.message);
+          }
+        }
         
-        if (!tempOrder.mul_no) {
+        // ✅ mul_no가 없으면 삭제 진행, 있으면 스킵
+        if (!orderHasMulNo && deleteOrderId) {
           // 결제 완료 없이 팝업만 닫힘 → 주문 삭제
           console.log('[monitorPaymentWindow] 결제 미완료 - 팝업만 닫힘');
           hidePaymentProcessing();
           
-          if (deleteOrderId) {
-            console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', deleteOrderId);
-            try {
-              const token = getToken();
-              console.log('[monitorPaymentWindow] 토큰:', token ? 'O' : 'X');
-              console.log('[monitorPaymentWindow] 삭제 요청 시작...');
-              
-              const deleteRes = await fetch(`/api/orders/${deleteOrderId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+          console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', deleteOrderId);
+          try {
+            const token = getToken();
+            console.log('[monitorPaymentWindow] 토큰:', token ? 'O' : 'X');
+            console.log('[monitorPaymentWindow] 삭제 요청 시작...');
+            
+            const deleteRes = await fetch(`/api/orders/${deleteOrderId}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            console.log('[monitorPaymentWindow] 응답 상태:', deleteRes.status);
+            const deleteData = await deleteRes.json();
+            console.log('[monitorPaymentWindow] 응답 데이터:', JSON.stringify(deleteData, null, 2));
+            
+            if (deleteRes.ok && deleteData.success) {
+              console.log('[monitorPaymentWindow] ✅ 주문 삭제 완료');
+            } else {
+              console.error('[monitorPaymentWindow] ❌ 주문 삭제 실패:', deleteRes.status, deleteData.message);
+              console.error('[monitorPaymentWindow] 상세:', {
+                status: deleteData.order_status,
+                mul_no: deleteData.mul_no,
+                is_unpaid: deleteData.is_unpaid,
+                is_cancelled: deleteData.is_cancelled
               });
-              
-              console.log('[monitorPaymentWindow] 응답 상태:', deleteRes.status);
-              const deleteData = await deleteRes.json();
-              console.log('[monitorPaymentWindow] 응답 데이터:', JSON.stringify(deleteData, null, 2));
-              
-              if (deleteRes.ok && deleteData.success) {
-                console.log('[monitorPaymentWindow] ✅ 주문 삭제 완료');
-              } else {
-                console.error('[monitorPaymentWindow] ❌ 주문 삭제 실패:', deleteRes.status, deleteData.message);
-                console.error('[monitorPaymentWindow] 상세:', {
-                  status: deleteData.order_status,
-                  mul_no: deleteData.mul_no,
-                  is_unpaid: deleteData.is_unpaid,
-                  is_cancelled: deleteData.is_cancelled
-                });
-              }
-            } catch (e) {
-              console.error('[monitorPaymentWindow] 🔴 주문 삭제 오류:', e);
             }
-          } else {
-            console.log('[monitorPaymentWindow] 삭제할 주문ID를 찾을 수 없음');
+          } catch (e) {
+            console.error('[monitorPaymentWindow] 🔴 주문 삭제 오류:', e);
           }
           
           alert('결제가 취소되었습니다.');
-        } else {
+        } else if (orderHasMulNo) {
           console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제됨 - 삭제 안 함');
         }
       }
