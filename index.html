@@ -1681,6 +1681,11 @@ async function deletePaymentLink(linkId) {
 
 // 개인결제 링크로 접속 시 처리
 async function checkPaymentLinkAccess(skipTokenCheck = false) {
+  // [Fix] skipTokenCheck=true일 때는 중복 방지 플래그를 초기화 (로그인 후 재시도 위해)
+  if (skipTokenCheck && window.paymentLinkContext) {
+    window.paymentLinkContext.isChecked = false;
+  }
+  
   // Context already active - prevent duplicate calls
   if (window.paymentLinkContext && window.paymentLinkContext.isActive && window.paymentLinkContext.isChecked) {
     console.log('[checkPaymentLinkAccess] Context already set - preventing duplicate');
