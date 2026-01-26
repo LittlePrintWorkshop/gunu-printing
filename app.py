@@ -1070,7 +1070,11 @@ def cancel_user_order(current_user, order_id):
 @app.route('/api/orders/<order_id>', methods=['DELETE'])
 @token_required
 def delete_user_order(current_user, order_id):
-    """사용자가 취소된 자신의 주문을 삭제"""
+    """
+    사용자가 미완료 주문 또는 취소된 주문을 삭제
+    - 결제 미완료 (mul_no 없음): 바로 삭제 가능
+    - 취소된 주문: 삭제 가능
+    """
     order = Order.query.filter_by(order_id=order_id).first()
     if not order:
         return jsonify({'success': False, 'message': '주문을 찾을 수 없습니다.'}), 404
@@ -1079,9 +1083,19 @@ def delete_user_order(current_user, order_id):
     if order.user_db_id != current_user.id:
         return jsonify({'success': False, 'message': '다른 사용자의 주문은 삭제할 수 없습니다.'}), 403
     
-    # 취소된 주문만 삭제 가능
-    if order.status != 'cancelled':
-        return jsonify({'success': False, 'message': '취소된 주문만 삭제할 수 있습니다.'}), 400
+    # 삭제 가능한 경우:
+    # 1. 결제 미완료 상태 (mul_no가 없고 pending 상태)
+    # 2. 취소된 주문 (status='cancelled')
+    is_unpaid = not order.mul_no and order.status == 'pending'
+    is_cancelled = order.status == 'cancelled'
+    
+    if not (is_unpaid or is_cancelled):
+        return jsonify({
+            'success': False, 
+            'message': '결제 미완료 또는 취소된 주문만 삭제할 수 있습니다.',
+            'order_status': order.status,
+            'mul_no': order.mul_no
+        }), 400
     
     db.session.delete(order)
     db.session.commit()
