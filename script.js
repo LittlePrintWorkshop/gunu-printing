@@ -44,10 +44,15 @@ window.paymentLinkContext = {
 // PayApp 결제 후 돌아올 때 결제 완료 처리
 function checkPaymentComplete() {
   const params = new URLSearchParams(window.location.search);
+  const fullUrl = window.location.href;
+  console.log('=== checkPaymentComplete 실행 ===');
+  console.log('현재 전체 URL:', fullUrl);
   console.log('현재 URL 파라미터:', window.location.search);
   console.log('order_complete 값:', params.get('order_complete'));
   const returnedOrderId = params.get('order_id');
   const payCode = params.get('pay_code'); // 개인결제 링크 코드
+  
+  console.log('✅ 파라미터 체크 완료:', { order_complete: params.get('order_complete'), order_id: returnedOrderId, pay_code: payCode });
   
   if (params.get('order_complete') === 'true') {
     console.log('결제 완료 감지됨');
@@ -4735,6 +4740,8 @@ async function startPayment(totalAmount, user) {
   
   // [Fix] returnUrl에 order_complete=true 신호 추가 - 결제 완료 후 완료창 표시
   const returnUrl = window.location.origin + '/?order_complete=true';
+  console.log('[startPayment] 🔗 returnUrl 설정:', returnUrl);
+  console.log('[startPayment] PayApp.setParam 호출 예정 - returnurl 포함');
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
