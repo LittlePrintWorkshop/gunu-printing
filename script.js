@@ -4640,6 +4640,11 @@ async function onPaymentComplete(paymentResult) {
     return;
   }
 
+  // ✅ 결제 완료됨 - 임시 주문 ID 삭제 (팝업 모니터링이 삭제하지 않도록)
+  sessionStorage.removeItem('pendingOrderId');
+  sessionStorage.removeItem('pendingPaymentLinkOrderId');
+  console.log('[onPaymentComplete] ✅ 결제 완료 - 임시 주문 추적 제거');
+
   // 임시 주문 정보 가져오기 (결제링크용 + 일반주문용 둘다 확인)
   let tempOrder = JSON.parse(localStorage.getItem('tempOrder') || '{}');
   if (!tempOrder.order_id) {
