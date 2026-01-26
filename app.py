@@ -292,7 +292,7 @@ def payment_callback():
         # 에러가 발생해도 OK 반환 (PayApp 재시도 방지)
         return 'OK', 200
 
-@app.route('/payment-complete-close')
+@app.route('/payment-complete-close', methods=['GET'])
 def payment_complete_close():
     """PayApp returnurl - 팝업 닫기 신호 전송"""
     print("[payment_complete_close] PayApp에서 리다이렉트됨 - 팝업 닫기")
@@ -369,7 +369,7 @@ def static_files(path):
         return '', 404
     
     # [Fix] 특정 라우트는 처리하지 않음 (Flask가 처리하도록)
-    if path in ['login', 'signup', 'payment-complete-close']:
+    if path in ['login', 'signup']:
         return '', 404
     
     # JavaScript 파일의 MIME type을 명시적으로 설정
