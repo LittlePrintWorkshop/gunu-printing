@@ -3606,8 +3606,12 @@ function monitorPaymentWindow(payappWindow) {
         console.log('[monitorPaymentWindow] 팝업이 닫혔습니다');
         clearInterval(checkInterval);
         
-        // ✅ 팝업이 닫히면 sessionStorage 임시 주문 ID 먼저 제거
-        // (결제가 진행 중이었다면 onPaymentComplete가 이미 제거했을 것)
+        // ✅ 먼저 sessionStorage에서 주문ID를 저장 (삭제하기 전에!)
+        const deleteOrderId = sessionStorage.getItem('pendingOrderId') || 
+                              sessionStorage.getItem('pendingPaymentLinkOrderId');
+        console.log('[monitorPaymentWindow] 저장된 주문ID:', deleteOrderId);
+        
+        // ✅ 그 다음 sessionStorage 제거
         sessionStorage.removeItem('pendingOrderId');
         sessionStorage.removeItem('pendingPaymentLinkOrderId');
         
@@ -3622,16 +3626,6 @@ function monitorPaymentWindow(payappWindow) {
           // 결제 완료 없이 팝업만 닫힘 → 주문 삭제
           console.log('[monitorPaymentWindow] 결제 미완료 - 팝업만 닫힘');
           hidePaymentProcessing();
-          
-          // 임시 저장된 주문ID 확인 (개인결제링크 또는 일반 주문 모두 대응)
-          let deleteOrderId = JSON.parse(localStorage.getItem('pendingOrderId') || 'null') ||
-                               JSON.parse(localStorage.getItem('pendingPaymentLinkOrderId') || 'null');
-          
-          // sessionStorage에서도 확인 (혹시 남아있을 수 있음)
-          if (!deleteOrderId) {
-            deleteOrderId = sessionStorage.getItem('pendingOrderId') || 
-                            sessionStorage.getItem('pendingPaymentLinkOrderId');
-          }
           
           if (deleteOrderId) {
             console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', deleteOrderId);
@@ -3663,8 +3657,6 @@ function monitorPaymentWindow(payappWindow) {
             } catch (e) {
               console.error('[monitorPaymentWindow] 🔴 주문 삭제 오류:', e);
             }
-            sessionStorage.removeItem('pendingOrderId');
-            sessionStorage.removeItem('pendingPaymentLinkOrderId');
           } else {
             console.log('[monitorPaymentWindow] 삭제할 주문ID를 찾을 수 없음');
           }
