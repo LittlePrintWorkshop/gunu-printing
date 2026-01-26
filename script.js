@@ -84,7 +84,7 @@ function checkPaymentComplete() {
   if (tempOrder) {
     const orderData = JSON.parse(tempOrder);
     console.log('장바구니 주문 처리 시작');
-    saveOrderFromPayment(orderData);
+    await saveOrderToServer(orderData, orderData.total_price);
   }
 }
 
@@ -3641,6 +3641,8 @@ function monitorPaymentWindow(payappWindow) {
         }
 
         // mul_no가 없으면 미결제 상태이므로 주문 자동 삭제
+        console.log('[monitorPaymentWindow] 결제 여부 판단:', { orderHasMulNo, deleteOrderId });
+        
         if (!orderHasMulNo && deleteOrderId) {
           console.log('[monitorPaymentWindow] 결제 미완료 - 미결제 주문 삭제:', deleteOrderId);
           hidePaymentProcessing();
