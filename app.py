@@ -292,7 +292,7 @@ def payment_callback():
         # 에러가 발생해도 OK 반환 (PayApp 재시도 방지)
         return 'OK', 200
 
-@app.route('/payment-complete-close', methods=['GET'])
+@app.route('/payment-complete-close', methods=['GET', 'POST'])
 def payment_complete_close():
     """PayApp returnurl - 팝업 닫기 신호 전송"""
     print("[payment_complete_close] PayApp에서 리다이렉트됨 - 팝업 닫기")
