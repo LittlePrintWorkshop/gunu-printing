@@ -42,7 +42,7 @@ window.paymentLinkContext = {
 
 // ===== 결제 완료 처리 =====
 // PayApp 결제 후 돌아올 때 결제 완료 처리
-function checkPaymentComplete() {
+async function checkPaymentComplete() {
   const params = new URLSearchParams(window.location.search);
   const fullUrl = window.location.href;
   console.log('=== checkPaymentComplete 실행 ===');
