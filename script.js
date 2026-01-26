@@ -2,6 +2,13 @@ function get(id) {
   return document.getElementById(id);
 }
 
+// 아이템 이름에서 수량 부분을 제거 (예: "소량 인디고 중철 (1권)" -> "소량 인디고 중철")
+function stripQtyFromName(name) {
+  if (!name) return name;
+  // "(1권)", "(2권)", ... 패턴 제거 및 "(1, 2)", "(A4, A5)" 등 크기 패턴도 고려
+  return name.replace(/\s*\(\d+[권장]*\)\s*$/, '').trim();
+}
+
 // Payment Link Context - centralized state management
 window.paymentLinkContext = {
   isActive: false,
@@ -2486,7 +2493,7 @@ function displayOrderDetailModal(order) {
         itemsDetail += `
           <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
             <div style="font-size:16px; font-weight:700; color:#0f172a; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #037a3f;">
-              📦 ${item.name || '상품'}${items.length > 1 ? ` (${idx + 1})` : ''}
+              📦 ${stripQtyFromName(item.name) || '상품'}${items.length > 1 ? ` (${idx + 1})` : ''}
             </div>
             
             ${opts.qty ? `
@@ -4362,7 +4369,7 @@ function renderCartView() {
       list.innerHTML += `
             <div style="display:flex; justify-content:space-between; background:#fff; border:1px solid var(--line); border-radius:16px; padding:18px; align-items:flex-start; width:100%; box-sizing:border-box;">
               <div style="flex:1;">
-                <h4 style="margin:0 0 8px 0; font-weight:900; color:#0f172a;">${item.name || '상품'}</h4>
+                <h4 style="margin:0 0 8px 0; font-weight:900; color:#0f172a;">${stripQtyFromName(item.name) || '상품'}</h4>
                 <p style="margin:0; font-size:12px; color:#64748b;">수량: ${item.qty || 0}</p>
                 ${bindingHtml}
                 ${paperHtml}
@@ -4647,7 +4654,7 @@ async function startPayment(totalAmount, user, orderId) {
   
   // 장바구니의 상품명들로부터 좋은 상품명 생성
   const cart = JSON.parse(localStorage.getItem(CART_KEY) || '[]');
-  const goodnames = cart.map(item => item.name || '인쇄 상품').join(', ');
+  const goodnames = cart.map(item => stripQtyFromName(item.name) || '인쇄 상품').join(', ');
   const displayGoodname = goodnames.length > 30 ? goodnames.substring(0, 30) + '...' : goodnames;
   
   // [Fix] returnurl에 orderId 포함 - 결제 완료 후 orderId를 받아 완료화면 표시
@@ -5044,7 +5051,7 @@ async function renderOrderHistory() {
       }
       
       const firstItem = items[0] || {};
-      const itemName = firstItem.name || '주문 상품';
+      const itemName = stripQtyFromName(firstItem.name) || '주문 상품';
       const itemQty = formatQty(firstItem.qty || items.length, '권');
       
       const statusColors = {
@@ -5095,7 +5102,7 @@ async function renderOrderHistory() {
                 <div style="font-size:12px; color:#64748b; margin-bottom:8px; font-weight:700;">주문 상품 (${items.length}개)</div>
                 ${items.map(item => {
                   const qtyText = formatQty(item.qty, '권');
-                  const nameText = item.name || '상품';
+                  const nameText = stripQtyFromName(item.name) || '상품';
                   const qtyPart = qtyText ? ` (${qtyText})` : '';
                   return `<div style="font-size:13px; color:#475569; margin-bottom:4px;">• ${nameText}${qtyPart} - ${(item.price || 0).toLocaleString()}원</div>`;
                 }).join('')}
@@ -5466,7 +5473,7 @@ async function viewOrderDetail(orderId) {
                   return `
                     <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
                       <div style="font-size:16px; font-weight:700; color:#0f172a; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #037a3f;">
-                        📦 ${item.name || '상품'}${order.items.length > 1 ? ` (${idx + 1})` : ''}
+                        📦 ${stripQtyFromName(item.name) || '상품'}${order.items.length > 1 ? ` (${idx + 1})` : ''}
                       </div>
                       
                       ${qtyText ? `
