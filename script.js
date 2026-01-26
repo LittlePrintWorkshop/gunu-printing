@@ -3606,16 +3606,33 @@ function monitorPaymentWindow(payappWindow) {
         console.log('[monitorPaymentWindow] 팝업이 닫혔습니다');
         clearInterval(checkInterval);
         
-        // 결제가 실제로 완료되었는지 확인 (mul_no가 저장되었는지)
+        // ✅ 팝업이 닫히면 sessionStorage 임시 주문 ID 먼저 제거
+        // (결제가 진행 중이었다면 onPaymentComplete가 이미 제거했을 것)
+        sessionStorage.removeItem('pendingOrderId');
+        sessionStorage.removeItem('pendingPaymentLinkOrderId');
+        
+        // ✅ onPaymentComplete가 실행될 시간을 주기 위해 500ms 대기
+        // 그 후 tempOrder.mul_no를 다시 확인
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
         const tempOrder = JSON.parse(localStorage.getItem('tempOrder') || '{}');
+        console.log('[monitorPaymentWindow] 500ms 대기 후 tempOrder.mul_no:', tempOrder.mul_no);
+        
         if (!tempOrder.mul_no) {
           // 결제 완료 없이 팝업만 닫힘 → 주문 삭제
           console.log('[monitorPaymentWindow] 결제 미완료 - 팝업만 닫힘');
           hidePaymentProcessing();
           
           // 임시 저장된 주문ID 확인 (개인결제링크 또는 일반 주문 모두 대응)
-          let deleteOrderId = sessionStorage.getItem('pendingOrderId') || 
-                               sessionStorage.getItem('pendingPaymentLinkOrderId');
+          let deleteOrderId = JSON.parse(localStorage.getItem('pendingOrderId') || 'null') ||
+                               JSON.parse(localStorage.getItem('pendingPaymentLinkOrderId') || 'null');
+          
+          // sessionStorage에서도 확인 (혹시 남아있을 수 있음)
+          if (!deleteOrderId) {
+            deleteOrderId = sessionStorage.getItem('pendingOrderId') || 
+                            sessionStorage.getItem('pendingPaymentLinkOrderId');
+          }
+          
           if (deleteOrderId) {
             console.log('[monitorPaymentWindow] 결제 실패 주문 삭제:', deleteOrderId);
             try {
@@ -3648,9 +3665,13 @@ function monitorPaymentWindow(payappWindow) {
             }
             sessionStorage.removeItem('pendingOrderId');
             sessionStorage.removeItem('pendingPaymentLinkOrderId');
+          } else {
+            console.log('[monitorPaymentWindow] 삭제할 주문ID를 찾을 수 없음');
           }
           
           alert('결제가 취소되었습니다.');
+        } else {
+          console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제됨 - 삭제 안 함');
         }
       }
     } catch (error) {

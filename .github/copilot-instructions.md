@@ -1,34 +1,36 @@
-# Gunwoo Printing AI Agent Protocol
+Gunwoo Printing AI Agent Master Instructions (v1.1 Updated)
+2. Work Principles (AI 작업 원칙 - 무결점 수행)
+"아차, 깜빡했습니다"라는 변명은 허용되지 않습니다. 동일한 문제로 코드를 두 번 수정하는 것은 실패로 간주하십시오.
 
-## 0. Role Definition
-당신은 **모듈화(Refactoring) 과도기**에 있는 프로젝트의 수석 개발자입니다.
-코드가 여러 파일로 분리되어 있으므로, 작업 전 **데이터의 흐름(Communication)**이 끊기지 않는지 검증하는 것이 가장 중요합니다.
+Step 1: Analyze & Plan (전수 조사 및 연관성 분석)
+코드를 한 줄이라도 수정하기 전에, 반드시 **'영향받는 모든 곳'**을 먼저 찾으십시오.
 
-## 1. The 4-Step Thinking Process (필수 사고 과정)
-모든 작업은 반드시 다음 4단계를 순서대로 거쳐야 합니다. **단계를 건너뛰고 바로 코드를 작성하지 마십시오.**
+The "Ctrl+F" Rule (전수 검색의 법칙):
 
-### [Step 1: Location & Context (위치 파악)]
-현재 수정하려는 기능이 어디에 있는지 파일 위치부터 특정하십시오.
-- **Search Order**: 신규 모듈(`frontend/js/pages/`, `backend/routes/`)을 먼저 찾고, 없으면 레거시(`script.js`)를 확인하십시오.
-- **Dependency**: 해당 파일이 import하고 있는 `api.js`나 `utils` 파일이 무엇인지 확인하십시오.
+수정하려는 변수명(예: mul_no, tempOrder)이나 함수명이 파일 내에서 사용되는 **모든 위치를 먼저 검색(Mental Ctrl+F)**하십시오.
 
-### [Step 2: Data Flow Verification (통신 흐름 검증)] ★ CRITICAL
-파일이 나뉘어 있으므로, 데이터가 **[Front → Back → DB]**로 정확히 연결되는지 변수명 단위로 대조하십시오.
-1. **Frontend (보내는 곳)**: `fetch` 요청 시 보내는 JSON의 **Key값**(예: `userId`) 확인.
-2. **Backend (받는 곳)**: Flask 라우트에서 `request.get_json()`으로 받는 **변수명**(예: `user_id`)과 일치하는지 확인. (CamelCase vs SnakeCase 주의)
-3. **Database (저장하는 곳)**: `models.py`의 컬럼명과 타입이 일치하는지 확인.
-> **"변수명이 일치하지 않거나, import 경로가 틀리면 코드를 짜기 전에 보고하십시오."**
+절대 눈앞에 보이는 에러 라인만 고치지 마십시오.
 
-### [Step 3: Impact Analysis (영향도 분석)]
-- 이 수정이 다른 파일(예: 공통 `api.js` 함수)에 영향을 주는지 확인하십시오.
-- **PayApp Check**: 결제 로직 수정 시 `mul_no` 변수가 전체 흐름에서 유실되지 않는지 시뮬레이션하십시오.
+Check: "이 변수를 업데이트할 때, 이를 참조하는 Loop, Event Listener, Callback, 다른 JS 파일은 누구인가?"
 
-### [Step 4: Surgical Editing (핀셋 수정)]
-- **No Lazy Diffs**: 수정할 때 `// ... 기존 코드` 주석으로 생략하지 말고, **수정하는 함수 전체를 온전하게 출력**하십시오.
-- **Minimal Change**: 파일 간의 연결 고리(Interface)를 건드리지 말고, 내부 로직만 안전하게 수정하십시오.
+State Consistency Check (상태 동기화 필수):
 
----
+데이터의 저장소(DB, localStorage, sessionStorage, Global Variable) 간의 불일치를 사전에 찾아내십시오.
 
-## 2. Communication Rules (대화 원칙)
-- 문제를 해결할 때: "그냥 고쳤습니다"라고 하지 말고, **"프론트에서는 A를 보냈는데, 백엔드에서 B를 기다리고 있어서 연결이 끊겨 있었습니다. 이를 A로 통일했습니다."**라고 원인을 설명하십시오.
-- 파일 위치가 모호할 때: "이 기능은 `script.js`에도 있고 `order.js`에도 흔적이 있습니다. 어느 쪽을 기준으로 작업할까요?"라고 먼저 물어보십시오.
+Scenario: "onPaymentComplete에서 값을 바꿨다면, monitorPaymentWindow 루프가 보고 있는 localStorage도 똑같이 갱신되었는가?"를 확인하지 않으면 코드를 짜지 마십시오.
+
+Prevent "Tunnel Vision" (터널 시야 방지):
+
+문제의 **증상(Symptom)**만 덮지 말고 **원인(Root Cause)**을 추적하십시오.
+
+단순히 if문으로 예외 처리를 하는 것이 답이 아닐 수 있습니다. 데이터 흐름 자체가 끊겨 있는지 확인하십시오.
+
+Step 2: Surgical Editing (완전한 코드 제공)
+[CRITICAL] No Lazy Diffs: // ... 기존 코드 금지. 수정된 함수나 블록은 반드시 전체를 출력하십시오.
+
+Atomic Consistency: 변수 하나를 고칠 때, 그 변수를 사용하는 읽기(Read) 로직과 쓰기(Write) 로직을 한 번의 답변에서 동시에 수정하십시오. (나눠서 고치지 마십시오.)
+
+Step 3: Verification (자가 검증)
+코드를 출력하기 전, 스스로에게 물으십시오: "이 수정을 적용했을 때, 기존에 잘 돌던 모니터링 루프나 콜백 함수가 예전 데이터를 보고 오작동할 가능성은 0%인가?"
+
+만약 확신이 없다면 로그(console.log)를 먼저 심어서 확인하겠다고 제안하십시오.
