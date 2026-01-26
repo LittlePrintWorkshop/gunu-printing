@@ -3616,7 +3616,7 @@ function monitorPaymentWindow(payappWindow) {
         // 3초 기다렸다가 (PayApp이 서버로 피드백을 보내는 시간) 결제 여부 확인
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        // 서버에서 직접 주문 정보 조회 (mul_no 확인)
+        // 서버에서 직접 주문 정보 조회 (mul_no와 pay_type 확인)
         let orderHasMulNo = false;
         if (deleteOrderId) {
           try {
@@ -3633,11 +3633,12 @@ function monitorPaymentWindow(payappWindow) {
 
               // 응답 데이터 구조 파악 (order 객체 또는 직접 mul_no)
               const order = checkData.order || checkData;
-              if (order && order.mul_no) {
+              // [Fix] mul_no뿐만 아니라 pay_type도 확인 (결제 방식이 설정되어야 결제 완료)
+              if (order && order.mul_no && order.pay_type) {
                 orderHasMulNo = true;
-                console.log('[monitorPaymentWindow] 결제 확인: mul_no 있음 -', order.mul_no);
+                console.log('[monitorPaymentWindow] 결제 확인: mul_no=', order.mul_no, ', pay_type=', order.pay_type);
               } else {
-                console.log('[monitorPaymentWindow] 미결제 확인: mul_no 없음');
+                console.log('[monitorPaymentWindow] 미결제 확인: mul_no=', order?.mul_no, ', pay_type=', order?.pay_type);
               }
             } else {
               console.log('[monitorPaymentWindow] GET 요청 실패 (상태:', checkRes.status + ')');
