@@ -266,11 +266,11 @@ def payment_callback():
                     order.mul_no = mul_no
                     order.pay_type = pay_type
                     
-                    # [Fix] pay_type이 있을 때만 상태를 'paid'로 변경
+                    # [Fix] pay_type이 있을 때만 상태를 'completed'로 변경
                     # pay_type이 없으면 = 아직 미결제 상태 유지 (프론트에서 결제가 완료되지 않았다는 뜻)
                     if pay_type:
-                        order.status = 'paid'
-                        print(f"✅ 주문 {order_id}에 mul_no={mul_no}, pay_type={pay_type}, status=paid 저장 완료")
+                        order.status = 'completed'
+                        print(f"✅ 주문 {order_id}에 mul_no={mul_no}, pay_type={pay_type}, status=completed 저장 완료")
                     else:
                         print(f"⚠️ 주문 {order_id}에 mul_no={mul_no} 저장만 (pay_type 미수신 - 상태 유지)")
                     

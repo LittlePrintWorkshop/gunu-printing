@@ -3662,7 +3662,7 @@ function monitorPaymentWindow(payappWindow) {
         // [Fix] 홈페이지로 가지 않고 "결제 확인 중..." 상태 유지
         updatePaymentProcessingMessage(
           '결제 처리 중입니다',
-          '결제 결과를 확인하는 중입니다.<br>잠시만 기다려주세요.',
+          '결제 결과를 확인하는 중입니다.<br>팝업이 자동으로 닫혀야 합니다.<br>닫혀있지 않으면 수동으로 닫아주세요.',
           false
         );
         
@@ -3708,9 +3708,9 @@ function monitorPaymentWindow(payappWindow) {
             console.log('[monitorPaymentWindow] 서버 주문 상태:', order.status, '| mul_no:', order.mul_no);
             
             // 2단계: 상태에 따라 처리
-            if (order.status === 'completed') {
+            if (order.status === 'completed' || order.status === 'paid') {
               // 이미 결제 완료됨 - 모래시계를 ✅로 변경
-              console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제 완료됨');
+              console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제 완료됨 (상태:', order.status + ')');
               
               // [Fix] 팝업 강제 종료 시도 (여러 방법 시도)
               try {
