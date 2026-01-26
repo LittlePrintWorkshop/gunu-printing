@@ -3634,12 +3634,18 @@ function updatePaymentProcessingMessage(title, message, isComplete = false) {
   
   if (isComplete) {
     // 결제 완료 표시
-    if (iconEl) iconEl.textContent = '✅';
+    if (iconEl) {
+      iconEl.textContent = '✅';
+      iconEl.style.animation = 'none'; // 회전 멈추기
+    }
     if (noteEl) noteEl.textContent = '';
     overlay.style.background = 'rgba(0, 0, 0, 0.7)'; // 유지
   } else {
     // 대기 중 표시
-    if (iconEl) iconEl.textContent = '⏳';
+    if (iconEl) {
+      iconEl.textContent = '⏳';
+      iconEl.style.animation = 'spin 2s linear infinite'; // 회전 시작
+    }
     if (noteEl) noteEl.textContent = '이 창을 닫지 마세요.';
   }
 }
