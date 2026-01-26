@@ -3517,18 +3517,55 @@ async function orderDirectlyFromQuote() {
     qtyInOrder: orderItem.qty,
     fullItem: orderItem
   });
-  console.log('[orderDirectlyFromQuote] 임시 직주문 데이터 저장:', tempDirectOrderData);
+  console.log('[orderDirectlyFromQuote] 임시 직주문 데이터:', tempDirectOrderData);
 
-  // [Fix] localStorage에만 저장 (결제 완료 후 monitorPaymentWindow에서 서버에 저장)
-  localStorage.setItem('tempDirectOrder', JSON.stringify(tempDirectOrderData));
-  
-  // [Fix] 클라이언트에서 orderId 생성 (sessionStorage에 저장 - monitorPaymentWindow에서 사용)
-  const clientOrderId = 'TEMP-' + Date.now();
-  sessionStorage.setItem('pendingOrderId', clientOrderId);
-  console.log('[orderDirectlyFromQuote] 클라이언트 임시주문ID 생성:', clientOrderId);
+  // [Fix] 서버에 먼저 주문을 생성 (상태: pending/미결제)
+  // 서버에서 orderId를 리턴받아 결제 팝업에서 var1으로 전달
+  // 결제 완료 후 mul_no가 저장되면 주문내역에 표시됨
+  try {
+    const response = await fetch('/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+      },
+      body: JSON.stringify({
+        ...tempDirectOrderData,
+        status: 'pending' // [Fix] 미결제 상태로 생성
+      })
+    });
 
-  // 결제 실행 (orderId 포함)
-  startPaymentDirectOrder(finalPrice, user, clientOrderId);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[orderDirectlyFromQuote] 주문 생성 실패:', response.status, errorText);
+      alert(`주문 생성 실패 (${response.status}): ${errorText}`);
+      window._ordering = false;
+      return;
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      console.error('[orderDirectlyFromQuote] 주문 생성 실패:', result);
+      alert('주문 생성에 실패했습니다. 다시 시도해주세요.');
+      window._ordering = false;
+      return;
+    }
+
+    const orderId = result.order_id;
+    console.log('[orderDirectlyFromQuote] ✅ 미결제 주문 생성 완료:', {
+      orderId,
+      totalPrice: finalPrice
+    });
+
+    // 결제 실행 (orderId 포함)
+    startPaymentDirectOrder(finalPrice, user, orderId);
+  } catch (e) {
+    console.error('[orderDirectlyFromQuote] 주문 생성 중 오류:', e);
+    alert('주문 생성 중 오류가 발생했습니다: ' + e.message);
+    window._ordering = false;
+    return;
+  }
+
   window._ordering = false;
 }
 
@@ -3551,13 +3588,13 @@ function showPaymentProcessing() {
   
   overlay.innerHTML = `
     <div style="background: white; padding: 40px; border-radius: 12px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
-      <div style="font-size: 48px; margin-bottom: 20px; animation: spin 2s linear infinite;">⏳</div>
-      <h2 style="color: #0f172a; margin-bottom: 10px; font-size: 20px;">결제 진행 중입니다</h2>
-      <p style="color: #64748b; margin-bottom: 20px; font-size: 14px; line-height: 1.6;">
+      <div style="font-size: 48px; margin-bottom: 20px; animation: spin 2s linear infinite;" class="payment-icon">⏳</div>
+      <h2 style="color: #0f172a; margin-bottom: 10px; font-size: 20px;" class="payment-title">결제 진행 중입니다</h2>
+      <p style="color: #64748b; margin-bottom: 20px; font-size: 14px; line-height: 1.6;" class="payment-message">
         결제 창이 열립니다.<br>
         결제를 완료해주세요.
       </p>
-      <p style="color: #94a3b8; font-size: 12px;">
+      <p style="color: #94a3b8; font-size: 12px;" class="payment-note">
         이 창을 닫지 마세요.
       </p>
       <style>
@@ -3570,6 +3607,31 @@ function showPaymentProcessing() {
   `;
   
   document.body.appendChild(overlay);
+}
+
+// [Fix] 결제 완료 메시지로 업데이트
+function updatePaymentProcessingMessage(title, message, isComplete = false) {
+  const overlay = document.getElementById('payment-processing-overlay');
+  if (!overlay) return;
+
+  const titleEl = overlay.querySelector('.payment-title');
+  const messageEl = overlay.querySelector('.payment-message');
+  const noteEl = overlay.querySelector('.payment-note');
+  const iconEl = overlay.querySelector('.payment-icon');
+
+  if (titleEl) titleEl.textContent = title;
+  if (messageEl) messageEl.innerHTML = message;
+  
+  if (isComplete) {
+    // 결제 완료 표시
+    if (iconEl) iconEl.textContent = '✅';
+    if (noteEl) noteEl.textContent = '';
+    overlay.style.background = 'rgba(0, 0, 0, 0.7)'; // 유지
+  } else {
+    // 대기 중 표시
+    if (iconEl) iconEl.textContent = '⏳';
+    if (noteEl) noteEl.textContent = '이 창을 닫지 마세요.';
+  }
 }
 
 // 결제중 상태 제거
@@ -3597,101 +3659,96 @@ function monitorPaymentWindow(payappWindow) {
         console.log('[monitorPaymentWindow] 팝업이 닫혔습니다');
         clearInterval(checkInterval);
         
-        hidePaymentProcessing();
+        // [Fix] 홈페이지로 가지 않고 "결제 확인 중..." 상태 유지
+        updatePaymentProcessingMessage(
+          '결제 처리 중입니다',
+          '결제 결과를 확인하는 중입니다.<br>잠시만 기다려주세요.',
+          false
+        );
         
-        // [Fix] sessionStorage에서 미결제 주문ID 확인
+        // [Fix] 신호 도착까지 계속 폴링 (고정 3초가 아님)
         const deleteOrderId = sessionStorage.getItem('pendingOrderId') ||
                               sessionStorage.getItem('pendingPaymentLinkOrderId');
         console.log('[monitorPaymentWindow] 미결제 주문ID:', deleteOrderId);
         
-        // 3초 기다렸다가 (PayApp이 서버로 피드백을 보내는 시간) 결제 여부 확인
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        
-        // 서버에서 직접 주문 정보 조회 (mul_no와 pay_type 확인)
         let orderHasMulNo = false;
-        if (deleteOrderId) {
-          try {
-            const token = getToken();
-            const checkRes = await fetch(`/api/orders/${deleteOrderId}`, {
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            console.log('[monitorPaymentWindow] GET 응답 상태:', checkRes.status);
-
-            if (checkRes.ok) {
-              const checkData = await checkRes.json();
-              console.log('[monitorPaymentWindow] GET 응답 데이터:', JSON.stringify(checkData));
-
-              // 응답 데이터 구조 파악 (order 객체 또는 직접 mul_no)
-              const order = checkData.order || checkData;
-              // [Fix] mul_no뿐만 아니라 pay_type도 확인 (결제 방식이 설정되어야 결제 완료)
-              if (order && order.mul_no && order.pay_type) {
-                orderHasMulNo = true;
-                console.log('[monitorPaymentWindow] 결제 확인: mul_no=', order.mul_no, ', pay_type=', order.pay_type);
-              } else {
-                console.log('[monitorPaymentWindow] 미결제 확인: mul_no=', order?.mul_no, ', pay_type=', order?.pay_type);
-              }
-            } else {
-              console.log('[monitorPaymentWindow] GET 요청 실패 (상태:', checkRes.status + ')');
-            }
-          } catch (e) {
-            console.log('[monitorPaymentWindow] GET 조회 오류:', e.message);
-          }
-        }
-
-        // mul_no가 없으면 미결제 상태이므로 주문 자동 삭제
-        console.log('[monitorPaymentWindow] 결제 여부 판단:', { orderHasMulNo, deleteOrderId });
+        let pollCount = 0;
+        const maxPolls = 120; // 최대 120번 (60초 × 2 = 2분 등)
+        const pollInterval = 500; // 500ms마다 확인
         
-        if (!orderHasMulNo && deleteOrderId) {
-          console.log('[monitorPaymentWindow] 결제 미완료 - 미결제 주문 삭제:', deleteOrderId);
-          hidePaymentProcessing();
+        // 신호 도착까지 계속 폴링
+        const pollCheckInterval = setInterval(async () => {
+          pollCount++;
+          
+          if (deleteOrderId && pollCount <= maxPolls) {
+            try {
+              const token = getToken();
+              const checkRes = await fetch(`/api/orders/${deleteOrderId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
 
-          try {
-            const token = getToken();
-            console.log('[monitorPaymentWindow] 토큰:', token ? 'O' : 'X');
-            console.log('[monitorPaymentWindow] 삭제 요청 시작...');
+              if (checkRes.ok) {
+                const checkData = await checkRes.json();
+                const order = checkData.order || checkData;
+                
+                if (order && order.mul_no && order.pay_type) {
+                  orderHasMulNo = true;
+                  console.log('[monitorPaymentWindow] ✅ 신호 도착! mul_no=', order.mul_no);
+                  clearInterval(pollCheckInterval);
+                  
+                  // [Fix] 결제 완료 메시지 표시
+                  updatePaymentProcessingMessage(
+                    '✅ 결제가 완료되었습니다!',
+                    '주문을 처리하는 중입니다...',
+                    true
+                  );
+                  
+                  // [Fix] 결제 완료 시 주문 상태를 completed로 업데이트
+                  try {
+                    const updateRes = await fetch(`/api/orders/${deleteOrderId}`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({ status: 'completed' })
+                    });
 
-            const deleteRes = await fetch(`/api/orders/${deleteOrderId}`, {
-              method: 'DELETE',
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
+                    if (updateRes.ok) {
+                      console.log('[monitorPaymentWindow] ✅ 주문 상태 completed로 업데이트 완료');
+                    }
+                  } catch (e) {
+                    console.error('[monitorPaymentWindow] 주문 상태 업데이트 중 오류:', e);
+                  }
 
-            console.log('[monitorPaymentWindow] 응답 상태:', deleteRes.status);
-            const deleteData = await deleteRes.json();
-            console.log('[monitorPaymentWindow] 응답 데이터:', JSON.stringify(deleteData, null, 2));
-
-            if (deleteRes.ok && deleteData.success) {
-              console.log('[monitorPaymentWindow] 미결제 주문 삭제 완료');
-            } else {
-              console.error('[monitorPaymentWindow] 미결제 주문 삭제 실패:', deleteRes.status, deleteData.message);
+                  // [Fix] 2초 후 완료 화면 표시 및 모래시계 종료
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  hidePaymentProcessing();
+                  showOrderComplete({
+                    order_id: deleteOrderId,
+                    order_code: deleteOrderId
+                  });
+                  
+                  return;
+                }
+              }
+            } catch (e) {
+              console.log('[monitorPaymentWindow] 폴링 확인 오류:', e.message);
             }
-          } catch (e) {
-            console.error('[monitorPaymentWindow] 주문 삭제 중 오류:', e);
+          } else if (pollCount > maxPolls) {
+            // 타임아웃 (120번 × 500ms = 60초)
+            console.log('[monitorPaymentWindow] 폴링 타임아웃 - 결제 확인 실패');
+            clearInterval(pollCheckInterval);
+            hidePaymentProcessing();
+            alert('결제 처리 중에 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
           }
-
-          alert('결제가 취소되었습니다.');
-        } else if (orderHasMulNo) {
-          console.log('[monitorPaymentWindow] 결제 완료된 주문입니다 - 완료 처리 진행중');
-          
-          // [Fix] 결제 완료 시 임시 주문정보를 서버에 저장
-          const tempCartOrder = localStorage.getItem('tempCartOrder');
-          const tempDirectOrder = localStorage.getItem('tempDirectOrder');
-          
-          if (tempCartOrder) {
-            console.log('[monitorPaymentWindow] 장바구니 임시주문 저장 시작');
-            const orderData = JSON.parse(tempCartOrder);
-            await saveOrderToServer(orderData, orderData.total_price);
-            localStorage.removeItem('tempCartOrder');
-          } else if (tempDirectOrder) {
-            console.log('[monitorPaymentWindow] 바로주문 임시주문 저장 시작');
-            const orderData = JSON.parse(tempDirectOrder);
-            await saveOrderToServer(orderData, orderData.total_price);
-            localStorage.removeItem('tempDirectOrder');
-          } else {
-            console.log('[monitorPaymentWindow] 임시주문 데이터 없음 - 완료화면 표시 스킵');
-          }
-        }
-
+        }, pollInterval);
+        
+        // 5분 후 자동 정리 (방어)
+        setTimeout(() => {
+          clearInterval(pollCheckInterval);
+        }, 5 * 60 * 1000);
+        
         // sessionStorage 정리
         sessionStorage.removeItem('pendingOrderId');
         sessionStorage.removeItem('pendingPaymentLinkOrderId');
@@ -4645,26 +4702,52 @@ async function submitOrder() {
     orderDetails.shipping.cost = totalShipping;
   }
 
-  // [Fix] localStorage에만 저장 (결제 완료 후 monitorPaymentWindow에서 서버에 저장)
-  const tempCartOrderData = {
-    items: cart,
-    total_price: finalPrice,
-    delivery_info: deliveryInfo,
-    order_details: orderDetails
-  };
-  localStorage.setItem('tempCartOrder', JSON.stringify(tempCartOrderData));
-  console.log('[submitOrder] ✅ 임시 장바구니 주문정보 저장 완료:', {
-    totalPrice: finalPrice,
-    itemCount: cart.length
-  });
+  // [Fix] 서버에 먼저 주문을 생성 (상태: pending/미결제)
+  // 서버에서 orderId를 리턴받아 결제 팝업에서 var1으로 전달
+  // 결제 완료 후 mul_no가 저장되면 주문내역에 표시됨
+  try {
+    const response = await fetch('/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
+      },
+      body: JSON.stringify({
+        items: cart,
+        total_price: finalPrice,
+        delivery_info: deliveryInfo,
+        order_details: orderDetails,
+        status: 'pending' // [Fix] 미결제 상태로 생성
+      })
+    });
 
-  // [Fix] 클라이언트에서 orderId 생성 (sessionStorage에 저장 - monitorPaymentWindow에서 사용)
-  const clientOrderId = 'TEMP-' + Date.now();
-  sessionStorage.setItem('pendingOrderId', clientOrderId);
-  console.log('[submitOrder] 클라이언트 임시주문ID 생성:', clientOrderId);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[submitOrder] 주문 생성 실패:', response.status, errorText);
+      alert(`주문 생성 실패 (${response.status}): ${errorText}`);
+      return;
+    }
 
-  // 결제 실행 (orderId 전달)
-  startPayment(finalPrice, user, clientOrderId);
+    const result = await response.json();
+    if (!result.success) {
+      console.error('[submitOrder] 주문 생성 실패:', result);
+      alert('주문 생성에 실패했습니다. 다시 시도해주세요.');
+      return;
+    }
+
+    const orderId = result.order_id;
+    console.log('[submitOrder] ✅ 미결제 주문 생성 완료:', {
+      orderId,
+      totalPrice: finalPrice,
+      itemCount: cart.length
+    });
+
+    // 결제 실행 (orderId 전달)
+    startPayment(finalPrice, user, orderId);
+  } catch (e) {
+    console.error('[submitOrder] 주문 생성 중 오류:', e);
+    alert('주문 생성 중 오류가 발생했습니다: ' + e.message);
+  }
 }
 
 // PayApp 결제 시작
