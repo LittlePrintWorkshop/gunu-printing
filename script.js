@@ -3696,10 +3696,31 @@ function monitorPaymentWindow(payappWindow) {
             
             // 2단계: 상태에 따라 처리
             if (orderData.status === 'completed') {
-              // 이미 결제 완료됨 - 완료 화면으로 이동
+              // 이미 결제 완료됨 - 모래시계를 ✅로 변경
               console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제 완료됨');
-              hidePaymentProcessing();
-              showOrderComplete(orderData);
+              
+              // [Fix] 팝업이 아직 열려있으면 닫기
+              try {
+                if (payappWindow && !payappWindow.closed) {
+                  console.log('[monitorPaymentWindow] 팝업 닫는 중...');
+                  payappWindow.close();
+                }
+              } catch (e) {
+                console.log('[monitorPaymentWindow] 팝업 닫기 시도:', e.message);
+              }
+              
+              // 모래시계 → ✅로 변경
+              updatePaymentProcessingMessage(
+                '✅ 결제가 완료되었습니다!',
+                `주문번호: ${orderData.order_code || orderData.order_id}`,
+                true  // isComplete = true
+              );
+              
+              // 2초 후 숨기고 홈으로 이동
+              setTimeout(() => {
+                hidePaymentProcessing();
+                goHome();
+              }, 2000);
             } else if (orderData.status === 'pending') {
               // 아직 미결제 - 취소 신호 전송
               console.log('[monitorPaymentWindow] 주문이 pending 상태 - 취소 신호 전송');
