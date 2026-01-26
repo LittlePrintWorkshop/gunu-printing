@@ -5204,9 +5204,7 @@ async function viewOrderDetail(orderId) {
                     ? `<div style="margin-top:12px; padding-top:12px; border-top:1px solid #e2e8f0;">
                         <div style="font-size:11px; color:#64748b; margin-bottom:6px; font-weight:600;">📎 첨부파일 (${itemFiles.length}개)</div>
                         ${itemFiles.map((f, fileIdx) => {
-                          // order.files에서 해당 파일 찾기 (다운로드를 위해)
                           const fileIndex = order.files ? order.files.findIndex((of, oi) => {
-                            // 파일명과 크기로 매칭 시도
                             return of.name === f.name && of.size === f.size;
                           }) : -1;
                           const hasData = f.data && f.data.startsWith('data:');
@@ -5218,29 +5216,65 @@ async function viewOrderDetail(orderId) {
                       </div>`
                     : '';
                   
+                  const qtyText = itemOptions.qty ? (typeof itemOptions.qty === 'string' && /부\s*$/.test(itemOptions.qty) ? itemOptions.qty : `${itemOptions.qty}부`) : '';
+                  
                   return `
-                    <div style="margin-bottom:${idx < order.items.length - 1 ? '16px' : '0'}; padding-bottom:${idx < order.items.length - 1 ? '16px' : '0'}; border-bottom:${idx < order.items.length - 1 ? '1px solid #e2e8f0' : 'none'};">
-                      <div style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:8px;">${item.name || '상품'}</div>
-                      <div style="font-size:12px; color:#64748b; margin-bottom:6px;">수량: ${item.qty || 0} | 금액: ${(item.price || 0).toLocaleString()}원</div>
-                      ${itemOptions.coverType || itemOptions.innerType ? `
-                        <div style="font-size:12px; color:#64748b; margin-top:8px; padding-top:8px; border-top:1px solid #e2e8f0;">
-                          ${itemOptions.coverType ? `<div style="margin-bottom:4px;">표지: ${itemOptions.coverType} ${itemOptions.coverGram || ''}</div>` : ''}
-                          ${itemOptions.innerType ? `<div>내지: ${itemOptions.innerType} ${itemOptions.innerGram || ''}</div>` : ''}
-                          ${itemOptions.coverPrint ? `<div style="margin-top:4px;">표지 인쇄: ${itemOptions.coverPrint}</div>` : ''}
-                          ${itemOptions.innerPrint ? `<div>내지 인쇄: ${itemOptions.innerPrint}</div>` : ''}
-                          ${itemOptions.binding ? `<div style="margin-top:4px;">제본: ${itemOptions.binding === 'staple' ? '중철' : '무선'}</div>` : ''}
-                          ${itemOptions.bindingDirection ? `<div>제본방향: ${itemOptions.bindingDirection}</div>` : ''}
-                          ${itemOptions.coating ? `<div style="margin-top:4px;">코팅: ${
-                            itemOptions.coating === 'matte' ? '무광코팅' :
-                            itemOptions.coating === 'gloss' ? '유광코팅' :
-                            itemOptions.coating === 'none' ? '코팅없음' :
-                            itemOptions.coating === '단면무광코팅' ? '무광코팅' :
-                            itemOptions.coating === '단면유광코팅' ? '유광코팅' :
-                            itemOptions.coating === '코팅없음' ? '코팅없음' :
-                            itemOptions.coating
-                          }</div>` : ''}
+                    <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                      <div style="font-size:16px; font-weight:700; color:#0f172a; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #037a3f;">
+                        📦 ${item.name || '상품'}${order.items.length > 1 ? ` (${idx + 1})` : ''}
+                      </div>
+                      
+                      ${qtyText ? `
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; padding:12px; background:#f0fdf4; border-radius:6px; border-left:3px solid #037a3f;">
+                          <span style="font-size:14px; color:#64748b;">수량:</span>
+                          <span style="color:#037a3f; font-size:18px; font-weight:700;">${qtyText}</span>
                         </div>
                       ` : ''}
+                      
+                      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-bottom:16px;">
+                        <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                          <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📘 표지</div>
+                          ${itemOptions.coverType ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">용지: <strong>${itemOptions.coverType}${itemOptions.coverGram ? ' ' + itemOptions.coverGram : ''}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">용지: 미선택</div>'}
+                          ${itemOptions.coverPages ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">페이지: <strong>${itemOptions.coverPages}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">페이지: 미선택</div>'}
+                          ${itemOptions.coverPrint ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">인쇄: <strong>${itemOptions.coverPrint}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">인쇄: 미선택</div>'}
+                          ${itemOptions.coverColor ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">색상: <strong>${itemOptions.coverColor === 'color' ? '컬러' : '흑백'}</strong></div>` : ''}
+                          ${(() => {
+                            const coatMap = {
+                              'none': '코팅없음',
+                              '0': '코팅없음',
+                              '코팅없음': '코팅없음',
+                              'matte': '무광코팅',
+                              'matt': '무광코팅',
+                              '1': '무광코팅',
+                              '단면무광코팅': '무광코팅',
+                              'gloss': '유광코팅',
+                              'glossy': '유광코팅',
+                              '3': '유광코팅',
+                              '단면유광코팅': '유광코팅'
+                            };
+                            const label = coatMap[itemOptions.coating] || itemOptions.coating;
+                            return itemOptions.coating
+                              ? `<div style="font-size:13px; color:#334155;">코팅: <strong>${label}</strong></div>`
+                              : '<div style="font-size:13px; color:#94a3b8;">코팅: 미선택</div>';
+                          })()}
+                        </div>
+                        
+                        <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                          <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📄 내지</div>
+                          ${itemOptions.innerType ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">용지: <strong>${itemOptions.innerType}${itemOptions.innerGram ? ' ' + itemOptions.innerGram : ''}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">용지: 미선택</div>'}
+                          ${itemOptions.innerPages ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">페이지: <strong>${itemOptions.innerPages}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">페이지: 미선택</div>'}
+                          ${itemOptions.innerPrint ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">인쇄: <strong>${itemOptions.innerPrint}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">인쇄: 미선택</div>'}
+                          ${itemOptions.innerColor ? `<div style="font-size:13px; color:#334155;">색상: <strong>${itemOptions.innerColor === 'color' ? '컬러' : '흑백'}</strong></div>` : ''}
+                        </div>
+                        
+                        <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                          <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📌 제본</div>
+                          ${itemOptions.binding ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">방식: <strong>${itemOptions.binding === 'staple' ? '중철' : itemOptions.binding === 'perfect' ? '무선' : itemOptions.binding}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">방식: 미선택</div>'}
+                          ${itemOptions.bindingDirection ? `<div style="font-size:14px; color:#037a3f; font-weight:700;">방향: ${itemOptions.bindingDirection}</div>` : '<div style="font-size:13px; color:#94a3b8;">방향: 미선택</div>'}
+                        </div>
+                      </div>
+                      
+                      <div style="font-size:14px; color:#0f172a; font-weight:600; margin-bottom:12px;">금액: ${(item.price || 0).toLocaleString()}원</div>
                       ${itemFilesHtml}
                     </div>
                   `;
