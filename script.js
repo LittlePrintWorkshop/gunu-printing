@@ -65,7 +65,27 @@ function checkPaymentComplete() {
       return;
     }
     
-    // 1. URL 파라미터에서 order_id가 있는 경우
+    // [Fix] 임시 장바구니 주문정보가 있으면 서버로 저장
+    const tempCartOrder = localStorage.getItem('tempCartOrder');
+    if (tempCartOrder) {
+      console.log('장바구니 임시 주문을 서버로 저장 시작');
+      const orderData = JSON.parse(tempCartOrder);
+      saveOrderToServer(orderData, orderData.total_price);
+      localStorage.removeItem('tempCartOrder');
+      return;
+    }
+    
+    // [Fix] 바로주문 임시정보가 있으면 서버로 저장
+    const tempDirectOrder = localStorage.getItem('tempDirectOrder');
+    if (tempDirectOrder) {
+      console.log('바로주문 임시 주문을 서버로 저장 시작');
+      const orderData = JSON.parse(tempDirectOrder);
+      saveOrderToServer(orderData, orderData.total_price);
+      localStorage.removeItem('tempDirectOrder');
+      return;
+    }
+
+    // 1. URL 파라미터에서 order_id가 있는 경우 (호환성)
     if (returnedOrderId) {
       console.log('order_id로 복구:', returnedOrderId);
       finalizeOrderById(returnedOrderId);
@@ -83,19 +103,13 @@ function checkPaymentComplete() {
 
     // 3. 임시 주문 정보가 있으면 처리 (옛날 방식)
     const tempOrder = localStorage.getItem('tempOrder');
-    const tempDirectOrder = localStorage.getItem('tempDirectOrder');
     
     console.log('tempOrder:', tempOrder);
-    console.log('tempDirectOrder:', tempDirectOrder);
     
     if (tempOrder) {
       const orderData = JSON.parse(tempOrder);
       console.log('장바구니 주문 처리 시작');
       saveOrderFromPayment(orderData);
-    } else if (tempDirectOrder) {
-      const orderData = JSON.parse(tempDirectOrder);
-      console.log('직접주문 처리 시작');
-      saveDirectOrderFromPayment(orderData);
     } else {
       console.log('임시 주문 정보 없음');
       alert('주문 정보를 찾을 수 없습니다. 주문 조회 메뉴에서 확인해주세요.');
@@ -3720,8 +3734,18 @@ async function startPaymentDirectOrder(totalAmount, user) {
 
   if (isLocalEnv) {
     toast('테스트 모드: 결제 없이 주문 완료 처리');
+    
+    // [Fix] 바로주문도 임시정보를 저장 후 서버로 보내기
+    const tempDirectOrderData = {
+      total_price: totalAmount,
+      delivery_info: {},
+      order_details: {}
+      // items는 바로주문이므로 없음
+    };
+    localStorage.setItem('tempDirectOrder', JSON.stringify(tempDirectOrderData));
+    
     await clearCartEverywhere();
-    // [Fix] 테스트 모드도 객체 형식으로 전달
+    // 테스트 모드는 바로 완료화면 표시
     showOrderComplete({
       order_id: 'OLOCAL-' + Date.now(),
       order_code: 'OLOCAL-' + Date.now(),
@@ -3741,6 +3765,16 @@ async function startPaymentDirectOrder(totalAmount, user) {
     return;
   }
 
+  // [Fix] 바로주문 임시정보를 localStorage에 저장 (결제 완료 후 서버로 전송)
+  const tempDirectOrderData = {
+    total_price: totalAmount,
+    delivery_info: {},
+    order_details: {}
+    // items는 바로주문이므로 없음
+  };
+  localStorage.setItem('tempDirectOrder', JSON.stringify(tempDirectOrderData));
+  console.log('[startPaymentDirectOrder] ✅ 바로주문 임시정보 저장 완료:', totalAmount);
+
   // PayApp 파라미터 설정
   PayApp.setDefault('userid', PAYAPP_USERID);
   PayApp.setDefault('linkkey', PAYAPP_LINKKEY);
@@ -3752,8 +3786,8 @@ async function startPaymentDirectOrder(totalAmount, user) {
   const quantity = get('sum-qty')?.textContent || '';
   const displayGoodname = quantity ? `${category} (${quantity})` : category;
   
-  // returnurl을 홈으로 설정 (실제 완료는 feedback에서만 처리)
-  const returnUrl = window.location.origin + '/';
+  // [Fix] returnUrl에 order_complete=true 신호 추가 - 결제 완료 후 완료창 표시
+  const returnUrl = window.location.origin + '/?order_complete=true';
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
@@ -3905,6 +3939,72 @@ async function syncCartToServer(cart) {
     }
   } catch (err) {
     console.error('서버 장바구니 동기화 실패:', err);
+  }
+}
+
+// [Fix] 결제 완료 후 임시 주문정보를 서버로 저장
+async function saveOrderToServer(orderData, totalAmount) {
+  try {
+    const token = getToken();
+    if (!token) {
+      console.error('[saveOrderToServer] 토큰 없음');
+      alert('로그인이 필요합니다.');
+      goLogin();
+      return;
+    }
+
+    console.log('[saveOrderToServer] 주문 서버 저장 시작:', {
+      items: orderData.items?.length,
+      totalPrice: totalAmount
+    });
+
+    const response = await fetch('/api/orders', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        items: orderData.items,
+        total_price: totalAmount,
+        delivery_info: orderData.delivery_info || {},
+        order_details: orderData.order_details || {}
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[saveOrderToServer] 주문 저장 실패:', response.status, errorText);
+      alert(`주문 저장 실패 (${response.status}): ${errorText}`);
+      return;
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      console.error('[saveOrderToServer] 주문 저장 실패:', result);
+      alert('주문 저장에 실패했습니다.');
+      return;
+    }
+
+    console.log('[saveOrderToServer] ✅ 주문 저장 완료:', result.order_id);
+    
+    // 완료 화면 표시
+    const order = result.order || {};
+    showOrderComplete({
+      order_id: result.order_id,
+      order_code: result.order_id,
+      total_price: totalAmount,
+      status: 'paid',
+      mul_no: orderData.mul_no || '',
+      items: orderData.items || []
+    });
+    
+    // 장바구니 비우기
+    await clearCartEverywhere();
+    
+  } catch (e) {
+    console.error('[saveOrderToServer] 오류:', e);
+    alert('주문 저장 중 오류가 발생했습니다: ' + e.message);
   }
 }
 
@@ -4561,55 +4661,30 @@ async function submitOrder() {
     orderDetails.shipping.cost = totalShipping;
   }
 
-  // [Fix] 결제 전에 먼저 주문을 서버에 생성 (상태: 미결제)
-  // 팝업 닫힘 시 이 주문이 미결제 상태면 자동 삭제됨
-  try {
-    const response = await fetch('/api/orders', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
-      },
-      body: JSON.stringify({
-        items: cart,
-        total_price: finalPrice,
-        delivery_info: deliveryInfo,
-        order_details: orderDetails
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[submitOrder] 주문 생성 실패:', response.status, errorText);
-      alert(`주문 생성 실패 (${response.status}): ${errorText}`);
-      return;
-    }
-
-    const result = await response.json();
-    if (!result.success) {
-      console.error('[submitOrder] 주문 생성 실패:', result);
-      alert('주문 생성에 실패했습니다. 다시 시도해주세요.');
-      return;
-    }
-
-    const orderId = result.order_id;
-    console.log('[submitOrder] ✅ 주문 생성 완료:', {
-      orderId,
-      totalPrice: finalPrice,
-      itemCount: cart.length
-    });
-
-    // 결제 실행 (orderId 전달)
-    startPayment(finalPrice, user, orderId);
-  } catch (e) {
-    console.error('[submitOrder] 주문 생성 중 오류:', e);
-    alert('주문 생성 중 오류가 발생했습니다: ' + e.message);
-  }
+  // [Fix] 임시 주문정보를 localStorage에 저장 (결제 완료 후 서버로 전송)
+  const tempOrderData = {
+    items: cart,
+    total_price: finalPrice,
+    delivery_info: deliveryInfo,
+    order_details: orderDetails,
+    user_id: user.user_id,
+    user_name: user.name,
+    user_phone: user.phone
+  };
+  
+  // localStorage에 임시 주문 저장
+  localStorage.setItem('tempCartOrder', JSON.stringify(tempOrderData));
+  console.log('[submitOrder] ✅ 임시 주문정보 저장 완료:', {
+    items: cart.length,
+    totalPrice: finalPrice
+  });
+  
+  // 결제 실행 (orderId 없음)
+  startPayment(finalPrice, user);
 }
 
 // PayApp 결제 시작
-// [Fix] orderId 파라미터 추가: 결제 취소 시 미결제 주문 삭제용
-async function startPayment(totalAmount, user, orderId) {
+async function startPayment(totalAmount, user) {
   // 로컬/사설망/테스트 플래그 시 실제 결제 생략
   const host = window.location.hostname || '';
   const params = new URLSearchParams(window.location.search);
@@ -4625,13 +4700,14 @@ async function startPayment(totalAmount, user, orderId) {
 
   if (isLocalEnv) {
     toast('테스트 모드: 결제 없이 주문 완료 처리');
+    
+    // 임시 주문정보를 최종 주문으로 저장
+    const tempOrderData = JSON.parse(localStorage.getItem('tempCartOrder') || '{}');
+    if (Object.keys(tempOrderData).length > 0) {
+      await saveOrderToServer(tempOrderData, totalAmount);
+    }
+    
     await clearCartEverywhere();
-    // [Fix] 테스트 모드도 객체 형식으로 전달
-    showOrderComplete({
-      order_id: orderId,
-      order_code: orderId,
-      total_price: totalAmount
-    });
     return;
   }
 
@@ -4657,10 +4733,8 @@ async function startPayment(totalAmount, user, orderId) {
   const goodnames = cart.map(item => stripQtyFromName(item.name) || '인쇄 상품').join(', ');
   const displayGoodname = goodnames.length > 30 ? goodnames.substring(0, 30) + '...' : goodnames;
   
-  // [Fix] returnurl에 orderId 포함 - 결제 완료 후 orderId를 받아 완료화면 표시
-  const returnUrl = orderId 
-    ? `${window.location.origin}/?order_id=${orderId}`
-    : window.location.origin + '/';
+  // [Fix] returnUrl에 order_complete=true 신호 추가 - 결제 완료 후 완료창 표시
+  const returnUrl = window.location.origin + '/?order_complete=true';
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
@@ -4671,21 +4745,13 @@ async function startPayment(totalAmount, user, orderId) {
     'redirectpay': '1',
     'returnurl': returnUrl,
     'feedbackurl': window.location.origin + '/api/payment-callback',
-    'var1': orderId || '', // [Fix] 주문번호
+    'var1': '', // [Fix] 결제 완료 후 주문 생성
     'var2': user.user_id, // 사용자 아이디
     'skip_cstpage': 'y' // 매출전표 페이지 이동 안함
   });
 
   // 결제중 상태 표시
   showPaymentProcessing();
-  
-  // [Fix] sessionStorage에 pendingOrderId 저장 (팝업 닫힘 시 확인용)
-  if (orderId) {
-    sessionStorage.setItem('pendingOrderId', orderId);
-    console.log('[startPayment] 미결제 주문ID 저장:', orderId);
-  }
-  
-  // [Fix] orderId 제거 - 결제 완료 후에만 주문 생성되므로 sessionStorage 저장 불필요
   
   // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
   const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
