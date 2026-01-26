@@ -4751,12 +4751,6 @@ function showOrderComplete(orderResult) {
     document.querySelectorAll('[id^="view-"]').forEach(el => el.style.display = 'none');
   }
 }
-  if (mainContent) {
-    mainContent.innerHTML = completeHtml;
-    mainContent.style.display = 'block';
-    document.querySelectorAll('[id^="view-"]').forEach(el => el.style.display = 'none');
-  }
-}
 
 function goOrderHistory() {
   const user = JSON.parse(localStorage.getItem(CURRENT_USER_KEY));
