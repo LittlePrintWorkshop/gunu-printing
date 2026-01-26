@@ -1799,15 +1799,15 @@ function showPaymentLinkPage(link) {
       <div style="max-width:100%; margin:30px 0 0 0; padding:0;">
         <div class="card" style="max-width:800px; margin:0 auto; border:none; box-shadow:none; background:transparent;">
           <div style="padding:30px 20px; border-bottom:2px solid var(--line); background:transparent;">
-            <h2 style="margin:0; font-size:28px; font-weight:900; color:#0f172a;">Payment</h2>
-            <p style="margin:8px 0 0 0; font-size:14px; color:#64748b;">Secure payment processing</p>
+            <h2 style="margin:0; font-size:28px; font-weight:900; color:#0f172a;">결제</h2>
+            <p style="margin:8px 0 0 0; font-size:14px; color:#64748b;">안전한 결제 처리</p>
           </div>
           <div style="padding:40px 20px;">
             <div style="background:linear-gradient(135deg, #fef3c7 0%, #fef08a 100%); border:2px solid #fcd34d; border-radius:12px; padding:30px; margin-bottom:30px;">
-              <h3 style="margin:0 0 16px 0; font-size:18px; font-weight:700; color:#92400e;">Login Required</h3>
-              <p style="margin:0 0 20px 0; font-size:14px; color:#78350f; line-height:1.6;">This is a member-only payment link.<br/>Please login first for secure payment.</p>
-              <button class="btn btn-primary" onclick="goLogin()" style="width:100%; padding:14px; font-size:15px; font-weight:700;">Login</button>
-              <button class="btn btn-secondary" onclick="goHome()" style="width:100%; padding:14px; font-size:14px; margin-top:12px; background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">Back to Home</button>
+              <h3 style="margin:0 0 16px 0; font-size:18px; font-weight:700; color:#92400e;">로그인 필요</h3>
+              <p style="margin:0 0 20px 0; font-size:14px; color:#78350f; line-height:1.6;">회원 전용 결제 링크입니다.<br/>안전한 결제를 위해 먼저 로그인해주세요.</p>
+              <button class="btn btn-primary" onclick="goLogin()" style="width:100%; padding:14px; font-size:15px; font-weight:700;">로그인</button>
+              <button class="btn btn-secondary" onclick="goHome()" style="width:100%; padding:14px; font-size:14px; margin-top:12px; background:#e2e8f0; color:#475569; border:1px solid #cbd5e1;">홈으로</button>
             </div>
           </div>
         </div>
@@ -2031,32 +2031,12 @@ async function processPaymentLink(linkCode) {
         payment_link_note: memoParsed?.note || '',
         payment_link_raw_memo: link.memo || ''
       },
-      payment_info: {
-        mul_no: null,
-        pay_type: 'payapp'
-      }
+      linkCode: linkCode
     };
-    let createdOrderId = null;
-    try {
-      const createRes = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(preOrderPayload)
-      });
-      const createData = await createRes.json();
-      if (!createData.success) {
-        alert(createData.message || '주문 생성에 실패했습니다.');
-        return;
-      }
-      createdOrderId = createData.order_id;
-    } catch (e) {
-      console.error('주문 생성 오류:', e);
-      alert('주문 생성 중 오류가 발생했습니다.');
-      return;
-    }
+    
+    // [Fix] 임시 주문 데이터를 localStorage에만 저장 (결제 완료 후 서버 전송)
+    localStorage.setItem('tempPaymentLinkOrder', JSON.stringify(preOrderPayload));
+    console.log('[processPaymentLink] 임시 주문 데이터 저장 완료');
 
     // PayApp 결제 시작
     console.log('[processPaymentLink] PayApp 설정 및 결제 시작');
@@ -2092,18 +2072,11 @@ async function processPaymentLink(linkCode) {
       'redirectpay': '1',
       'returnurl': returnUrl,
       'feedbackurl': window.location.origin + '/api/payment-callback',
-      'var1': createdOrderId,
+      'var1': '', // [Fix] 결제 완료 후 주문 생성
       'var2': userData?.id || linkCode,
       'skip_cstpage': 'y'
     });
     console.log('[processPaymentLink] PayApp.setParam 완료');
-
-    // 임시 주문 저장 (결제 완료 후 복원용)
-    localStorage.setItem('tempPaymentLinkOrder', JSON.stringify({
-      order_id: createdOrderId,
-      total_price: link.price,
-      linkCode: linkCode
-    }));
 
     console.log('[processPaymentLink] 결제 처리 화면 표시 중...');
     showPaymentProcessing();

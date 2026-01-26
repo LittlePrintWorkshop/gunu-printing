@@ -519,8 +519,8 @@ async function processPaymentLink(linkCode) {
       console.error('사용자 정보 조회 실패:', e);
     }
 
-    // 주문 생성 (로그인한 사용자의 정보를 사용)
-    const preOrderPayload = {
+    // [Fix] 임시 주문 데이터를 localStorage에 저장 (결제 완료 후 서버 전송)
+    const tempPaymentLinkOrder = {
       items: [{
         id: 'PAYMENT_LINK',
         category: '개인결제',
@@ -541,36 +541,10 @@ async function processPaymentLink(linkCode) {
         payment_link_note: memoParsed?.note || '',
         payment_link_raw_memo: link.memo || ''
       },
-      payment_info: {
-        mul_no: null,
-        pay_type: 'payapp'
-      }
+      linkCode: linkCode
     };
-    let createdOrderId = null;
-    try {
-      const createRes = await fetch('/api/orders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(preOrderPayload)
-      });
-      const createData = await createRes.json();
-      if (!createData.success) {
-        alert(createData.message || '주문 생성에 실패했습니다.');
-        return;
-      }
-      createdOrderId = createData.order_id;
-      
-      // 결제 취소 시 삭제할 수 있도록 임시 저장
-      console.log('[processPaymentLink] 생성된 주문ID:', createdOrderId);
-      sessionStorage.setItem('pendingPaymentLinkOrderId', createdOrderId);
-    } catch (e) {
-      console.error('주문 생성 오류:', e);
-      alert('주문 생성 중 오류가 발생했습니다.');
-      return;
-    }
+    localStorage.setItem('tempPaymentLinkOrder', JSON.stringify(tempPaymentLinkOrder));
+    console.log('[processPaymentLink] 임시 주문 데이터 저장 완료');
 
     // PayApp 결제 시작
     console.log('[processPaymentLink] PayApp 설정 및 결제 시작');
@@ -593,7 +567,8 @@ async function processPaymentLink(linkCode) {
     PayApp.setDefault('shopname', '건우프린팅');
     console.log('[processPaymentLink] PayApp.setDefault 완료');
 
-    const completePageUrl = window.location.origin + '/payment-complete.html?order_complete=true&order_id=' + encodeURIComponent(createdOrderId) + '&pay_code=' + encodeURIComponent(linkCode);
+    // [Fix] 결제 완료 후 주문이 생성되므로 여기서는 orderId 없음
+    const returnUrl = window.location.origin + '/';
 
     console.log('[processPaymentLink] PayApp.setParam 호출 중...');
     PayApp.setParam({
@@ -603,9 +578,9 @@ async function processPaymentLink(linkCode) {
       'memo': `개인결제 링크: ${linkCode}`,
       'smsuse': 'n',
       'redirectpay': '1',
-      'returnurl': completePageUrl,
+      'returnurl': returnUrl,
       'feedbackurl': window.location.origin + '/api/payment-callback',
-      'var1': createdOrderId,
+      'var1': '', // [Fix] 결제 완료 후 주문 생성
       'var2': linkCode,
       'skip_cstpage': 'y'
     });
