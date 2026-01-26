@@ -526,6 +526,24 @@ def create_order(current_user):
         traceback.print_exc()
         return jsonify({'success': False, 'message': f'주문 생성 실패: {str(e)}'}), 500
 
+@app.route('/api/orders/<order_id>', methods=['GET'])
+@token_required
+def get_order_detail(current_user, order_id):
+    """개별 주문 정보 조회"""
+    try:
+        order = Order.query.filter_by(order_id=order_id, user_db_id=current_user.id).first()
+        
+        if not order:
+            return jsonify({'success': False, 'message': '주문을 찾을 수 없습니다'}), 404
+        
+        return jsonify({
+            'success': True,
+            'order': order.to_dict()
+        })
+    except Exception as e:
+        print(f"❌ 주문 조회 에러: {e}")
+        return jsonify({'success': False, 'message': f'주문 조회 실패: {str(e)}'}), 500
+
 # ========== 장바구니 관련 API ==========
 @app.route('/api/cart', methods=['GET'])
 @token_required
