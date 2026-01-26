@@ -3744,14 +3744,53 @@ function monitorPaymentWindow(payappWindow) {
           }
         }, pollInterval);
         
+        // [Fix] 폴링 종료 후 결제 미완료 처리
+        // pollCheckInterval이 끝나면 자동으로 진행
+        const checkCompletionInterval = setInterval(async () => {
+          // pollCheckInterval이 끝났는지 확인
+          // (pollCheckInterval이 clear되었으면 진행)
+          if (!orderHasMulNo && pollCount > maxPolls) {
+            clearInterval(checkCompletionInterval);
+            
+            console.log('[monitorPaymentWindow] 결제 미완료 - 주문 삭제:', deleteOrderId);
+            hidePaymentProcessing();
+
+            try {
+              const token = getToken();
+              console.log('[monitorPaymentWindow] 결제 취소: 주문 삭제 시작...');
+
+              const deleteRes = await fetch(`/api/orders/${deleteOrderId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+
+              console.log('[monitorPaymentWindow] 삭제 응답 상태:', deleteRes.status);
+              const deleteData = await deleteRes.json();
+              console.log('[monitorPaymentWindow] 삭제 응답 데이터:', JSON.stringify(deleteData, null, 2));
+
+              if (deleteRes.ok && deleteData.success) {
+                console.log('[monitorPaymentWindow] ✅ 미결제 주문 삭제 완료');
+                alert('결제가 취소되었습니다.');
+              } else {
+                console.error('[monitorPaymentWindow] 미결제 주문 삭제 실패:', deleteRes.status, deleteData.message);
+                alert('주문 취소 처리 중 오류가 발생했습니다.');
+              }
+            } catch (e) {
+              console.error('[monitorPaymentWindow] 주문 삭제 중 오류:', e);
+              alert('주문 취소 처리 중 오류가 발생했습니다.');
+            }
+            
+            // sessionStorage 정리
+            sessionStorage.removeItem('pendingOrderId');
+            sessionStorage.removeItem('pendingPaymentLinkOrderId');
+          }
+        }, 500);
+        
         // 5분 후 자동 정리 (방어)
         setTimeout(() => {
           clearInterval(pollCheckInterval);
+          clearInterval(checkCompletionInterval);
         }, 5 * 60 * 1000);
-        
-        // sessionStorage 정리
-        sessionStorage.removeItem('pendingOrderId');
-        sessionStorage.removeItem('pendingPaymentLinkOrderId');
       }
     } catch (error) {
       console.log('[monitorPaymentWindow] 팝업 상태 확인 오류:', error.message);
