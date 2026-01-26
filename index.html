@@ -1694,11 +1694,35 @@ async function checkPaymentLinkAccess(skipTokenCheck = false) {
 
   const params = new URLSearchParams(window.location.search);
   const payCode = params.get('pay');
+  const orderId = params.get('order_id');  // [Fix] 장바구니 결제용 order_id도 처리
   
   console.log('[checkPaymentLinkAccess] Starting');
   console.log('[checkPaymentLinkAccess] Current URL:', window.location.href);
   console.log('[checkPaymentLinkAccess] URL params:', params.toString());
   console.log('[checkPaymentLinkAccess] payCode:', payCode);
+  console.log('[checkPaymentLinkAccess] orderId:', orderId);
+
+  // [Fix] 장바구니 결제 완료 (order_id 파라미터 있음)
+  if (orderId && !payCode) {
+    console.log('[checkPaymentLinkAccess] 장바구니 결제 완료 감지:', orderId);
+    try {
+      const token = getToken();
+      const orderRes = await fetch(`/api/orders/${orderId}`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (orderRes.ok) {
+        const orderData = await orderRes.json();
+        if (orderData.success && orderData.order) {
+          const order = orderData.order;
+          console.log('[checkPaymentLinkAccess] 주문 정보 조회 성공:', order.order_id);
+          showOrderComplete(order);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error('[checkPaymentLinkAccess] 장바구니 주문 조회 오류:', e);
+    }
+  }
 
   if (!payCode) {
     console.log('[checkPaymentLinkAccess] No payCode - early exit');
