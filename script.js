@@ -2,11 +2,111 @@ function get(id) {
   return document.getElementById(id);
 }
 
+// ===== 카테고리 탭 전환 =====
+function switchCatTab(category) {
+  console.log('switchCatTab called with:', category);
+  
+  // 모든 탭 버튼에서 active 제거
+  const allBtns = document.querySelectorAll('.cat-tab-btn');
+  console.log('Found tab buttons:', allBtns.length);
+  allBtns.forEach(btn => {
+    btn.classList.remove('active');
+  });
+  
+  // 모든 콘텐츠 패널 숨김
+  const allPanels = document.querySelectorAll('.cat-content-panel');
+  console.log('Found content panels:', allPanels.length);
+  allPanels.forEach(panel => {
+    panel.classList.remove('active');
+  });
+  
+  // 선택된 탭 활성화
+  const activeBtn = document.querySelector(`.cat-tab-btn[data-category="${category}"]`);
+  console.log('Active button found:', activeBtn);
+  if (activeBtn) {
+    activeBtn.classList.add('active');
+  }
+  
+  // 선택된 콘텐츠 표시
+  const contentId = `content-${category}`;
+  const contentPanel = document.getElementById(contentId);
+  console.log('Looking for content panel with id:', contentId, 'Found:', contentPanel);
+  if (contentPanel) {
+    contentPanel.classList.add('active');
+  }
+}
+
+// ===== 이미지 지연 로딩 (Lazy Loading) 유틸리티 =====
+/**
+ * 이미지가 뷰포트에 들어올 때만 로드하도록 설정
+ * 사용법: img 태그에 data-src 속성 사용, src는 플레이스홀더
+ */
+function initLazyLoading() {
+  if ('IntersectionObserver' in window) {
+    const imageObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          // data-src에서 실제 이미지 URL 로드
+          if (img.dataset.src) {
+            img.src = img.dataset.src;
+            img.removeAttribute('data-src');
+          }
+          observer.unobserve(img);
+        }
+      });
+    }, {
+      rootMargin: '50px' // 50px 전에 미리 로드 시작
+    });
+
+    // 모든 지연 로딩 이미지 감시
+    document.querySelectorAll('img[data-src]').forEach(img => {
+      imageObserver.observe(img);
+    });
+  } else {
+    // IntersectionObserver 미지원 브라우저: 즉시 로드
+    document.querySelectorAll('img[data-src]').forEach(img => {
+      img.src = img.dataset.src;
+    });
+  }
+}
+
 // 아이템 이름에서 수량 부분을 제거 (예: "소량 인디고 중철 (1권)" -> "소량 인디고 중철")
 function stripQtyFromName(name) {
   if (!name) return name;
   // "(1권)", "(2권)", ... 패턴 제거 및 "(1, 2)", "(A4, A5)" 등 크기 패턴도 고려
   return name.replace(/\s*\(\d+[권장]*\)\s*$/, '').trim();
+}
+
+// HTML 특수문자 이스케이프
+function escapeHtml(text) {
+  if (!text) return '';
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  };
+  return text.toString().replace(/[&<>"']/g, (m) => map[m]);
+}
+
+// 코팅 라벨 변환
+function getCoatingLabel(coating) {
+  const coatMap = {
+    'none': '코팅없음',
+    '0': '코팅없음',
+    '코팅없음': '코팅없음',
+    'matte': '무광코팅',
+    'matt': '무광코팅',
+    '1': '무광코팅',
+    '단면무광코팅': '무광코팅',
+    'gloss': '유광코팅',
+    'glossy': '유광코팅',
+    '3': '유광코팅',
+    '단면유광코팅': '유광코팅'
+  };
+  return coatMap[coating] || coating;
 }
 
 // Payment Link Context - centralized state management
@@ -39,6 +139,9 @@ window.paymentLinkContext = {
     return this.isActive && !this.isChecked;
   }
 };
+
+// 관리 패널 필터 상태
+let currentAdminFilterStatus = 'all';
 
 // ===== 결제 완료 처리 =====
 // PayApp 결제 후 돌아올 때 결제 완료 처리
@@ -90,13 +193,6 @@ window.addEventListener('message', (event) => {
   
   console.log('메시지 수신:', event.data);
   
-  // [Fix] PayApp 팝업에서 보내는 완료 신호 (returnurl에서 postMessage)
-  if (event.data.type === 'payment_completed_from_payapp') {
-    console.log('[message] PayApp 팝업 완료 신호 수신');
-    // 팝업이 자동으로 닫혀야 하지만, 혹시 모르니 강제 처리 없음
-    // monitorPaymentWindow가 팝업 닫힘을 감지할 것
-  }
-  
   if (event.data.type === 'paymentComplete') {
     console.log('팝업 창에서 결제 완료 메시지 수신:', event.data);
     
@@ -111,8 +207,17 @@ window.addEventListener('message', (event) => {
 window.addEventListener('load', async () => {
   console.log('Page load complete');
   
-  // Load category settings from server
-  await loadCategorySettingsFromServer();
+  // 지연 로딩 초기화
+  initLazyLoading();
+  
+  // 판매형 카테고리 로드 (홈페이지 전체메뉴)
+  loadSellableCategoriesForHome();
+  
+  // 종이 가격 DB 초기화 (메인 YEON_PRICE 업데이트)
+  initMainYeonPriceDB();
+  
+  // 가격 관리는 이제 pricing-functions.js에서 처리됨
+  // initPaperPriceDB() 호출 제거됨
   
   // Check for payment link context or pay parameter
   const payParam = new URLSearchParams(window.location.search).get('pay');
@@ -742,155 +847,8 @@ function adminLogout() {
 
 // ===== 상품 마진/상세 콘텐츠 관리 =====
 const CONTENT_DB_KEY = 'print_content_db';
-const DEFAULT_CONTENT = {
-  indigo: {
-    margin: 100,
-    img: {
-      staple: '',
-      perfect: ''
-    },
-    info: {
-      staple: '<p>HP Indigo 7K 프리미엄 인쇄</p>',
-      perfect: '<p>HP Indigo (무선) 프리미엄 인쇄</p>'
-    },
-    guide: {
-      staple: 'PDF 권장',
-      perfect: 'PDF 권장 (무선)'
-    },
-    ship: {
-      staple: '착불/택배',
-      perfect: '착불/택배'
-    }
-  },
-  digital: {
-    margin: 100,
-    img: {
-      staple: '',
-      perfect: ''
-    },
-    info: {
-      staple: '<p>흑백 디지털 마스터 (중철)</p>',
-      perfect: '<p>흑백 디지털 마스터 (무선)</p>'
-    },
-    guide: {
-      staple: 'Grayscale 권장',
-      perfect: 'Grayscale 권장'
-    },
-    ship: {
-      staple: '착불/택배',
-      perfect: '착불/택배'
-    }
-  },
-  offset: {
-    margin: 30,
-    img: {
-      staple: '',
-      perfect: ''
-    },
-    info: {
-      staple: '<p>대량 옵셋 인쇄 (중철)</p>',
-      perfect: '<p>대량 옵셋 인쇄 (무선)</p>'
-    },
-    guide: {
-      staple: 'CMYK 필수',
-      perfect: 'CMYK 필수'
-    },
-    ship: {
-      staple: '용달 착불',
-      perfect: '용달 착불'
-    }
-  },
-  flyer_small: {
-    margin: 50,
-    img: {
-      staple: '',
-      perfect: ''
-    },
-    info: {
-      staple: '<p>소량 전단 안내 (단면)</p>',
-      perfect: '<p>소량 전단 안내 (양면)</p>'
-    },
-    guide: {
-      staple: '단면/양면 선택',
-      perfect: '단면/양면 선택'
-    },
-    ship: {
-      staple: '착불/택배',
-      perfect: '착불/택배'
-    }
-  },
-  flyer_large: {
-    margin: 20,
-    img: {
-      staple: '',
-      perfect: ''
-    },
-    info: {
-      staple: '<p>대량 전단 안내 (중철)</p>',
-      perfect: '<p>대량 전단 안내 (무선)</p>'
-    },
-    guide: {
-      staple: '대량 제작 문의',
-      perfect: '대량 제작 문의'
-    },
-    ship: {
-      staple: '용달/착불',
-      perfect: '용달/착불'
-    }
-  }
-};
-let contentDB = JSON.parse(localStorage.getItem(CONTENT_DB_KEY) || 'null') || DEFAULT_CONTENT;
-
-// 서버에서 카테고리 설정 불러오기
-async function loadCategorySettingsFromServer() {
-  try {
-    const res = await fetch('/api/category-settings');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success && data.settings) {
-        // 서버 데이터를 contentDB에 병합
-        Object.keys(data.settings).forEach(cat => {
-          if (data.settings[cat] && Object.keys(data.settings[cat]).length > 0) {
-            contentDB[cat] = { ...contentDB[cat], ...data.settings[cat] };
-          }
-        });
-        localStorage.setItem(CONTENT_DB_KEY, JSON.stringify(contentDB));
-        console.log('[loadCategorySettingsFromServer] 서버에서 설정 로드 완료');
-      }
-    }
-  } catch (error) {
-    console.error('[loadCategorySettingsFromServer] 오류:', error);
-  }
-}
-
-function mergeContentDefaults() {
-  const merged = JSON.parse(JSON.stringify(DEFAULT_CONTENT));
-  Object.keys(merged).forEach(cat => {
-    if (contentDB[cat]) merged[cat] = { ...merged[cat],
-      ...contentDB[cat]
-    };
-  });
-  contentDB = merged;
-  localStorage.setItem(CONTENT_DB_KEY, JSON.stringify(contentDB));
-}
-mergeContentDefaults();
-
-// 디버그: 현재 contentDB를 새 창에 예쁘게 출력
-function dumpContentDB() {
-  try {
-    const w = window.open('', '_blank');
-    const pre = w.document.createElement('pre');
-    pre.style.whiteSpace = 'pre-wrap';
-    pre.style.padding = '12px';
-    pre.textContent = JSON.stringify(contentDB, null, 2);
-    w.document.body.appendChild(pre);
-    w.document.title = 'contentDB dump';
-  } catch (e) {
-    alert('새 창을 열 수 없습니다. 콘솔에 출력합니다.');
-    console.log('contentDB', contentDB);
-    alert('콘솔에 contentDB를 출력했습니다. (개발자 도구 확인)');
-  }
-}
+// 데이터베이스에서 로드 (하드코딩 제거)
+let contentDB = {};
 
 function initAdminContentEditor() {
   if (window.jQuery && $('#adm-info-txt').length && !$('#adm-info-txt').data('summernote')) {
@@ -963,15 +921,41 @@ function initAdminContentEditor() {
   }
 }
 
-function loadAdminContent() {
+async function loadAdminContent() {
   initAdminContentEditor();
+  
   // sync admin select with current category if available
   if (window.currentCategory && get('adm-cat-select')) {
     try { get('adm-cat-select').value = window.currentCategory; } catch(e){}
   }
+  
   const cat = get('adm-cat-select').value;
+  
+  // DB로부터 카테고리 비용 로드
+  try {
+    const response = await fetch('/api/category-costs');
+    const result = await response.json();
+    
+    if (!result.success) {
+      console.error('[ERROR] 카테고리 비용 로드 실패:', result.message);
+      return;
+    }
+    
+    const data = result.data[cat];
+    if (!data) {
+      console.warn('[WARN] 카테고리 데이터 없음:', cat);
+      return;
+    }
+    
+    // contentDB 업데이트
+    contentDB[cat] = data;
+    
+  } catch (e) {
+    console.error('[ERROR] API 호출 실패:', e);
+    return;
+  }
+  
   const data = contentDB[cat];
-  if (!data) return;
   
   // 마진율 (카테고리 공통)
   get('adm-margin-val').value = data.margin ?? 100;
@@ -1158,12 +1142,12 @@ function renderSlideUploadUI() {
   const slides = homepageDB.slides || [];
   slides.forEach((slideSrc, index) => {
     const slideDiv = document.createElement('div');
-    slideDiv.style.cssText = 'text-align:center; position:relative; flex:1; min-width:120px;';
+    slideDiv.style.cssText = 'display:flex; flex-direction:column; gap:6px; min-width:200px; max-width:250px;';
     slideDiv.innerHTML = `
       <img id="adm-home-slide-${index}-preview" src="${slideSrc || ''}" alt="슬라이드${index + 1}" 
-        style="width:100%; height:80px; object-fit:cover; border:1px solid #e2e8f0; border-radius:8px; display:block; margin-bottom:6px;" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div style=\\'width:100%; height:80px; display:flex; align-items:center; justify-content:center; border:1px solid #e2e8f0; border-radius:8px; background:#f1f5f9; color:#64748b; font-size:13px; font-weight:700; margin-bottom:6px;\\'>No Image</div>');">
-      <input type="file" accept="image/*" onchange="handleHomepageImageUpload(event, 'slides', ${index})" style="font-size:12px;">
-      <button class="btn" onclick="deleteSlide(${index})" style="margin-top:6px; width:100%; padding:6px; font-size:11px; background:#ef4444; color:#fff; border:none;">삭제</button>
+        style="width:100%; height:100px; object-fit:cover; border:1px solid #e2e8f0; border-radius:0; display:block;" onerror="this.style.display='none'; this.insertAdjacentHTML('afterend', '<div style=\\'width:100%; height:100px; display:flex; align-items:center; justify-content:center; border:1px solid #e2e8f0; border-radius:0; background:#f1f5f9; color:#64748b; font-size:13px; font-weight:700;\\'>No Image</div>');">
+      <input type="file" accept="image/*" onchange="handleHomepageImageUpload(event, 'slides', ${index})" style="font-size:11px; padding:4px;">
+      <button class="btn" onclick="deleteSlide(${index})" style="padding:8px 12px; font-size:12px; background:#ef4444; color:#fff; border:none; border-radius:0;">삭제</button>
     `;
     container.appendChild(slideDiv);
   });
@@ -1480,7 +1464,7 @@ function removeQuoteFile(idx) {
   updateQuoteFileList();
 }
 
-function saveAdminContent() {
+async function saveAdminContent() {
   const cat = get('adm-cat-select').value;
   const marginVal = Number(get('adm-margin-val').value) || 0;
   const binding = get('adm-binding-select') ? get('adm-binding-select').value : 'staple';
@@ -1507,8 +1491,7 @@ function saveAdminContent() {
     }
   };
   
-  // 데이터 구조 정규화: 기존에 문자열로 저장된 데이터가 있다면 객체 형태로 변환 (마이그레이션)
-  // img
+  // 데이터 구조 정규화
   if (!contentDB[cat].img || typeof contentDB[cat].img === 'string') {
     const prev = contentDB[cat].img || '';
     contentDB[cat].img = {
@@ -1516,7 +1499,6 @@ function saveAdminContent() {
       perfect: prev
     };
   }
-  // info
   if (!contentDB[cat].info || typeof contentDB[cat].info === 'string') {
     const prev = contentDB[cat].info || '';
     contentDB[cat].info = {
@@ -1524,7 +1506,6 @@ function saveAdminContent() {
       perfect: prev
     };
   }
-  // guide
   if (!contentDB[cat].guide || typeof contentDB[cat].guide === 'string') {
     const prev = contentDB[cat].guide || '';
     contentDB[cat].guide = {
@@ -1532,7 +1513,6 @@ function saveAdminContent() {
       perfect: prev
     };
   }
-  // ship
   if (!contentDB[cat].ship || typeof contentDB[cat].ship === 'string') {
     const prev = contentDB[cat].ship || '';
     contentDB[cat].ship = {
@@ -1550,28 +1530,40 @@ function saveAdminContent() {
   contentDB[cat].guide[binding] = get('adm-guide-txt').value;
   contentDB[cat].ship[binding] = get('adm-ship-txt').value;
   
-  // 로컬 스토리지에도 저장 (백업용)
-  localStorage.setItem(CONTENT_DB_KEY, JSON.stringify(contentDB));
+  // DB에 저장
+  try {
+    const response = await fetch(`/api/category-costs/${cat}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ margin: marginVal })
+    });
+    
+    const result = await response.json();
+    if (!result.success) {
+      alert('[ERROR] 저장 실패: ' + (result.message || '알 수 없는 오류'));
+      return;
+    }
+    
+    alert('[OK] 저장되었습니다!');
+  } catch (e) {
+    console.error('[ERROR] 저장 오류:', e);
+    alert('[ERROR] 저장 중 오류가 발생했습니다: ' + e.message);
+    return;
+  }
   
-  // 서버에 저장
-  saveCategoryToServer(cat, contentDB[cat]);
-  
-  // 디버그 로그: 저장된 내용 확인
+  // 디버그 로그
   try { console.log('[saveAdminContent] saved', { cat, binding, marginVal, infoLen: (infoVal||'').length }); } catch(e){}
 
-  // 저장 후 공개 뷰에 즉시 반영 (현재 보고있는 카테고리와 상관없이 적용 시도)
+  // 저장 후 공개 뷰에 즉시 반영
   try { applyContentToDetailTabs(cat); } catch(e) { console.error('applyContentToDetailTabs failed', e); }
 
-  // 현재 보고 있는 화면이 해당 카테고리라면 추가 동기화(라디오/제목)
+  // 현재 보고 있는 화면이 해당 카테고리라면 추가 동기화
   if (typeof window.currentCategory !== 'undefined' && window.currentCategory === cat) {
-    // 동기화: 공개 뷰의 바인딩을 관리자에서 저장한 바인딩으로 맞추고 즉시 반영
     const prevBind = window.currentBindType;
     window.currentBindType = binding;
-    // 라디오 버튼 상태 및 스타일 업데이트
     const radios = document.getElementsByName('ind-bind');
     radios.forEach(r => { if (r.value === binding) r.checked = true; });
     try { updateRadioStyles('ind-bind'); } catch (e) {}
-    // 타이틀 업데이트
     try {
       const titles = { indigo: '소량 인디고', digital: '흑백 디지털', offset: '대량 옵셋' };
       const bindNames = { staple: '중철', perfect: '무선' };
@@ -1580,48 +1572,30 @@ function saveAdminContent() {
       }
     } catch (e) {}
     applyContentToDetailTabs(cat);
-    // 이전 바인딩 보존 필요하면 복원 (주석 처리: 복원하지 않음 so user sees saved binding)
-    // window.currentBindType = prevBind;
   }
-}
-
-async function saveCategoryToServer(category, settings) {
-  try {
-    const token = getToken();
-    const res = await fetch('/api/category-settings', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ category, settings })
-    });
-    
-    const data = await res.json();
-    if (data.success) {
-      toast('서버에 저장되었습니다.');
-    } else {
-      console.error('서버 저장 실패:', data.message);
-      toast('서버 저장 실패: ' + data.message);
-    }
-  } catch (error) {
-    console.error('서버 저장 오류:', error);
-    toast('서버 저장 중 오류 발생');
-  }
-}
-
-function generateAIContent() {
-  if (!confirm('AI로 상세설명을 생성하시겠습니까? 기존 내용은 대체됩니다.')) return;
-  const sample = `<h2>상품 특징</h2><p>프리미엄 인쇄 품질과 선명한 컬러를 제공합니다.</p><ul><li>고급 종이 사용</li><li>선명한 색감</li><li>빠른 제작</li></ul>`;
-  if (window.jQuery && $('#adm-info-txt').length) $('#adm-info-txt').summernote('code', sample);
-  alert('기본 템플릿이 적용되었습니다. 수정 후 저장해주세요.');
 }
 
 // [수정] 상세설명/가이드/배송안내 탭 내용을 현재 제본 방식에 맞춰 업데이트하는 함수
 function applyContentToDetailTabs(cat) {
   // DB에서 해당 카테고리 데이터 가져오기
   const data = contentDB[cat];
-  if (!data) return;
+  if (!data) {
+    console.warn('[applyContentToDetailTabs] contentDB[' + cat + '] 없음 - DB에서 로드 필요');
+    // contentDB가 비어있으면 로드하도록 요청 (비동기, 강제하지 않음)
+    (async () => {
+      try {
+        const response = await fetch('/api/category-costs');
+        const result = await response.json();
+        if (result.success) {
+          Object.assign(contentDB, result.data);
+          applyContentToDetailTabs(cat);  // 재귀 호출
+        }
+      } catch (e) {
+        console.error('[applyContentToDetailTabs] contentDB 로드 실패:', e);
+      }
+    })();
+    return;
+  }
   // 디버그: 어떤 카테고리와 바인딩 값으로 렌더되는지 로깅
   try {
     const checked = document.querySelector('input[name="ind-bind"]:checked');
@@ -1693,7 +1667,7 @@ function applyContentToDetailTabs(cat) {
 }
 
 function showAdminTab(tabId) {
-  ['adm-orders', 'adm-content', 'adm-users', 'adm-homepage', 'adm-popup', 'adm-notice', 'adm-payment-links'].forEach(id => {
+  ['adm-orders', 'adm-categories', 'adm-content', 'adm-products', 'adm-users', 'adm-homepage', 'adm-popup', 'adm-notice', 'adm-payment-links', 'adm-pricing'].forEach(id => {
     const el = get(id);
     if (el) el.style.display = 'none';
   });
@@ -1707,7 +1681,7 @@ function showAdminTab(tabId) {
     if (window.currentBindType && get('adm-binding-select')) {
       try { get('adm-binding-select').value = window.currentBindType; } catch(e){}
     }
-    loadAdminContent();
+    loadAdminContent().catch(e => console.error('[ERROR] loadAdminContent:', e));
   }
   if (tabId === 'adm-users') renderUserList();
   if (tabId === 'adm-orders') loadAdminOrderList();
@@ -1716,6 +1690,9 @@ function showAdminTab(tabId) {
   if (tabId === 'adm-popup') { loadAdminPopupNotices(); }
   if (tabId === 'adm-payment-links') { 
     loadPaymentLinks();
+  }
+  if (tabId === 'adm-pricing') {
+    loadPricingSettings();
   }
 }
 
@@ -1814,27 +1791,67 @@ function renderOrderList() {
   body.innerHTML = '';
 
   if (activeOrders.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="padding:30px; text-align:center; color:#64748b;">아직 주문이 없습니다.</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="padding:30px; text-align:center; color:#64748b;">아직 주문이 없습니다.</td></tr>';
   } else {
     activeOrders.forEach((order, i) => {
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid #e6edf3';
       const orderId = order.orderId || `ORDER-${i}`;
       const statusColor = order.status === '접수완료' ? '#10b981' : order.status === '제작중' ? '#3b82f6' : order.status === '배송중' ? '#f59e0b' : order.status === '배송완료' ? '#6366f1' : '#64748b';
-      tr.innerHTML = `
-            <td style="padding:10px; font-weight:700; color:#037a3f;">${orderId}</td>
-            <td style="padding:10px;">${order.date || order.orderDate || '-'}</td>
-            <td style="padding:10px;">${order.userName || '비회원'}</td>
-            <td style="padding:10px;">${order.name || '상품'}</td>
-            <td style="padding:10px;">${(order.price || 0).toLocaleString()}원</td>
-            <td style="padding:10px; text-align:center;">
-              <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
-                <span style="padding:4px 10px; background:${statusColor}15; color:${statusColor}; border-radius:4px; font-size:11px; font-weight:700;">${order.status || '접수완료'}</span>
-                <button onclick="viewAdminOrderDetail('${orderId}')" style="padding:4px 8px; background:#037a3f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='#025a2f'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#037a3f'; this.style.transform='scale(1)'">상세보기</button>
-                <button onclick="cancelOrder('${orderId}')" style="padding:4px 8px; background:#ef4444; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='#dc2626'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ef4444'; this.style.transform='scale(1)'">취소</button>
-              </div>
-            </td>
-          `;
+      
+      // 체크박스 셀
+      const tdCheck = document.createElement('td');
+      tdCheck.style.cssText = 'padding:10px; text-align:center; width:60px; min-width:60px;';
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'order-list-checkbox';
+      checkbox.dataset.orderId = orderId;
+      checkbox.style.cssText = 'width:16px; height:16px; cursor:pointer;';
+      tdCheck.appendChild(checkbox);
+      
+      // 주문번호 셀
+      const tdOrderId = document.createElement('td');
+      tdOrderId.style.cssText = 'padding:10px; font-weight:700; color:#037a3f; width:180px; min-width:180px;';
+      tdOrderId.textContent = orderId;
+      
+      // 주문일 셀
+      const tdDate = document.createElement('td');
+      tdDate.style.cssText = 'padding:10px; width:180px; min-width:180px;';
+      tdDate.textContent = order.date || order.orderDate || '-';
+      
+      // 주문자 셀
+      const tdUser = document.createElement('td');
+      tdUser.style.cssText = 'padding:10px; width:100px; min-width:100px;';
+      tdUser.textContent = order.userName || '비회원';
+      
+      // 내용 셀
+      const tdName = document.createElement('td');
+      tdName.style.cssText = 'padding:10px; width:150px; min-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+      tdName.textContent = order.name || '상품';
+      
+      // 금액 셀
+      const tdPrice = document.createElement('td');
+      tdPrice.style.cssText = 'padding:10px; width:120px; min-width:120px;';
+      tdPrice.textContent = (order.price || 0).toLocaleString() + '원';
+      
+      // 관리 셀
+      const tdManage = document.createElement('td');
+      tdManage.style.cssText = 'padding:10px; text-align:center; width:200px; min-width:200px;';
+      tdManage.innerHTML = `
+        <div style="display:flex; gap:6px; justify-content:center; align-items:center;">
+          <span style="padding:4px 10px; background:${statusColor}15; color:${statusColor}; border-radius:0; font-size:11px; font-weight:700;">${order.status || '접수완료'}</span>
+          <button onclick="viewAdminOrderDetail('${orderId}')" style="padding:4px 8px; background:#037a3f; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='#025a2f'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#037a3f'; this.style.transform='scale(1)'">상세보기</button>
+          <button onclick="cancelOrder('${orderId}')" style="padding:4px 8px; background:#ef4444; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700; transition:all 0.2s;" onmouseover="this.style.background='#dc2626'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ef4444'; this.style.transform='scale(1)'">취소</button>
+        </div>
+      `;
+      
+      tr.appendChild(tdCheck);
+      tr.appendChild(tdOrderId);
+      tr.appendChild(tdDate);
+      tr.appendChild(tdUser);
+      tr.appendChild(tdName);
+      tr.appendChild(tdPrice);
+      tr.appendChild(tdManage);
       body.appendChild(tr);
     });
   }
@@ -1876,31 +1893,31 @@ async function loadAdminOrderList() {
   }
 }
 
-// 주문 상태별 통계 업데이트 (pending 제외)
+// 주문 상태별 통계 업데이트
 function updateAdminOrderStats(orders) {
   const stats = {
-    completed: 0,
-    preparing: 0,
-    shipping: 0,
-    delivered: 0
+    '주문접수': 0,
+    '제작중': 0,
+    '배송중': 0,
+    '배송완료': 0
   };
   
   orders.forEach(order => {
-    if (order.status === 'completed') stats.completed++;
-    else if (order.status === 'preparing') stats.preparing++;
-    else if (order.status === 'shipping') stats.shipping++;
-    else if (order.status === 'delivered') stats.delivered++;
+    if (order.status === '주문접수') stats['주문접수']++;
+    else if (order.status === '제작중') stats['제작중']++;
+    else if (order.status === '배송중') stats['배송중']++;
+    else if (order.status === '배송완료') stats['배송완료']++;
   });
   
-  const statCompleted = get('stat-completed');
+  const statPending = get('stat-pending');
   const statPreparing = get('stat-preparing');
   const statShipping = get('stat-shipping');
-  const statDelivered = get('stat-delivered');
+  const statCompleted = get('stat-completed');
   
-  if (statCompleted) statCompleted.textContent = stats.completed + '건';
-  if (statPreparing) statPreparing.textContent = stats.preparing + '건';
-  if (statShipping) statShipping.textContent = stats.shipping + '건';
-  if (statDelivered) statDelivered.textContent = stats.delivered + '건';
+  if (statPending) statPending.textContent = stats['주문접수'] + '건';
+  if (statPreparing) statPreparing.textContent = stats['제작중'] + '건';
+  if (statShipping) statShipping.textContent = stats['배송중'] + '건';
+  if (statCompleted) statCompleted.textContent = stats['배송완료'] + '건';
 }
 
 // 관리자 주문 날짜 범위 설정
@@ -1978,17 +1995,21 @@ async function applyAdminOrderDateFilter() {
       });
       
       renderAdminOrderTable(filteredOrders);
+      updateAdminOrderStats(filteredOrders);
     } else {
       renderAdminOrderTable([]);
+      updateAdminOrderStats([]);
     }
   } catch (error) {
     console.error('날짜 필터 에러:', error);
     renderAdminOrderTable([]);
+    updateAdminOrderStats([]);
   }
 }
 
 // 관리자 주문 상태별 필터
 async function filterAdminOrderByStatus(status) {
+  currentAdminFilterStatus = status;  // 현재 필터 상태 저장
   const token = getToken();
   if (!token) {
     toast('로그인이 필요합니다.');
@@ -2006,9 +2027,15 @@ async function filterAdminOrderByStatus(status) {
       btn.style.fontWeight = 'normal';
     }
   });
+  
+  // 배송 도구 항상 표시
+  const shippingTools = get('shipping-tools');
+  if (shippingTools) {
+    shippingTools.style.display = 'flex';
+  }
 
   try {
-    const response = await fetch('/api/admin/orders', {
+    const response = await fetch(`/api/admin/orders?status=${encodeURIComponent(status)}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`
@@ -2017,19 +2044,16 @@ async function filterAdminOrderByStatus(status) {
     
     const result = await response.json();
     if (result.success && result.orders) {
-      let filteredOrders = result.orders;
-      
-      if (status !== 'all') {
-        filteredOrders = result.orders.filter(order => order.status === status);
-      }
-      
-      renderAdminOrderTable(filteredOrders);
+      renderAdminOrderTable(result.orders);
+      updateAdminOrderStats(result.orders);
     } else {
       renderAdminOrderTable([]);
+      updateAdminOrderStats([]);
     }
   } catch (error) {
     console.error('상태 필터 에러:', error);
     renderAdminOrderTable([]);
+    updateAdminOrderStats([]);
   }
 }
 
@@ -2059,16 +2083,19 @@ async function searchAdminOrders() {
     const result = await response.json();
     if (result.success && result.orders) {
       renderAdminOrderTable(result.orders);
+      updateAdminOrderStats(result.orders);
       if (searchQuery) {
         toast(`${result.count}개의 주문을 찾았습니다.`);
       }
     } else {
       renderAdminOrderTable([]);
+      updateAdminOrderStats([]);
     }
   } catch (error) {
     console.error('검색 에러:', error);
     toast('검색 중 오류가 발생했습니다.');
     renderAdminOrderTable([]);
+    updateAdminOrderStats([]);
   }
 }
 
@@ -2077,7 +2104,7 @@ function renderAdminOrderTable(orders) {
   body.innerHTML = '';
 
   if (orders.length === 0) {
-    body.innerHTML = '<tr><td colspan="6" style="padding:30px; text-align:center; color:#64748b;">주문이 없습니다.</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="padding:30px; text-align:center; color:#64748b;">주문이 없습니다.</td></tr>';
     return;
   }
 
@@ -2087,19 +2114,19 @@ function renderAdminOrderTable(orders) {
     const orderId = order.id || order.order_id || 'N/A';
     
     const statusMap = {
-      'pending': { color: '#f59e0b', text: '신규' },
-      'completed': { color: '#10b981', text: '접수' },
-      'preparing': { color: '#3b82f6', text: '제작' },
-      'shipping': { color: '#8b5cf6', text: '배송' },
-      'delivered': { color: '#6366f1', text: '완료' },
-      'cancelled': { color: '#ef4444', text: '취소' },
-      'refund_requested': { color: '#f97316', text: '환불요청' },
-      'refunded': { color: '#6b7280', text: '환불완료' }
+      '주문접수': { color: '#f59e0b', text: '접수' },
+      '제작중': { color: '#3b82f6', text: '준비중' },
+      '배송중': { color: '#8b5cf6', text: '배송출발' },
+      '배송완료': { color: '#10b981', text: '완료' },
+      '취소': { color: '#ef4444', text: '취소' },
+      '환불요청': { color: '#f97316', text: '환불요청' },
+      '환불완료': { color: '#6b7280', text: '환불완료' }
     };
     
     const statusInfo = statusMap[order.status] || { color: '#64748b', text: order.status || '대기' };
     const createdDate = order.created_at ? new Date(order.created_at).toLocaleString('ko-KR') : '-';
-    const userName = order.user_id || '비회원';
+    const userName = order.customer_name || order.user_name || order.name || order.user_id || '비회원';
+    const userAddress = order.shipping_address || order.user_address || order.address || '-';
     
     let itemSummary = '상품';
     let isPersonalPay = false;
@@ -2130,45 +2157,88 @@ function renderAdminOrderTable(orders) {
     }
 
     const personalBadge = isPersonalPay
-      ? `<span style="margin-right:6px; padding:4px 8px; background:#ecfeff; color:#0ea5e9; border:1px solid #bae6fd; border-radius:999px; font-size:11px; font-weight:800;">개인결제</span>`
+      ? `<span style="margin-right:6px; padding:4px 8px; background:#ecfeff; color:#0ea5e9; border:1px solid #bae6fd; border-radius:0; font-size:11px; font-weight:800;">개인결제</span>`
       : '';
     
-    tr.innerHTML = `
-      <td style="padding:10px; font-weight:700; color:#037a3f; font-family:monospace;">${orderId}</td>
-      <td style="padding:10px; font-size:12px;">${createdDate}</td>
-      <td style="padding:10px;">${userName}</td>
-      <td style="padding:10px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">${personalBadge}<span>${itemSummary}</span></td>
-      <td style="padding:10px;">${(order.total_price || 0).toLocaleString()}원</td>
-      <td style="padding:10px; text-align:center;">
-        <div style="display:flex; gap:6px; justify-content:center; align-items:center; flex-wrap:wrap;">
-          <span style="padding:4px 10px; background:${statusInfo.color}15; color:${statusInfo.color}; border-radius:4px; font-size:11px; font-weight:700;">${statusInfo.text}</span>
-          <button onclick="viewAdminOrderDetail('${orderId}')" style="padding:4px 8px; background:#037a3f; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">상세</button>
-          ${order.status === 'refund_requested' ? `
-            <button onclick="approveRefund('${orderId}')" style="padding:4px 8px; background:#10b981; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">환불승인</button>
-            <button onclick="rejectRefund('${orderId}')" style="padding:4px 8px; background:#ef4444; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">환불거절</button>
-          ` : order.status === 'pending' ? `
-            <button onclick="updateAdminOrderStatus('${orderId}', 'completed')" style="padding:4px 8px; background:#10b981; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">접수</button>
-            <button onclick="updateAdminOrderStatus('${orderId}', 'cancelled')" style="padding:4px 8px; background:#ef4444; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">취소</button>
-          ` : order.status === 'completed' ? `
-            <button onclick="updateAdminOrderStatus('${orderId}', 'preparing')" style="padding:4px 8px; background:#3b82f6; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">제작</button>
-          ` : order.status === 'preparing' ? `
-            <button onclick="updateAdminOrderStatus('${orderId}', 'shipping')" style="padding:4px 8px; background:#8b5cf6; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">배송</button>
-          ` : order.status === 'shipping' ? `
-            <button onclick="updateAdminOrderStatus('${orderId}', 'delivered')" style="padding:4px 8px; background:#6366f1; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px; font-weight:700;">완료</button>
+    // 체크박스 셀
+    const tdCheck = document.createElement('td');
+    tdCheck.style.cssText = 'padding:10px; text-align:center; width:60px; min-width:60px;';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'order-list-checkbox';
+    checkbox.dataset.orderId = orderId;
+    checkbox.style.cssText = 'width:16px; height:16px; cursor:pointer;';
+    tdCheck.appendChild(checkbox);
+    
+    // 주문번호 셀
+    const tdOrderId = document.createElement('td');
+    tdOrderId.style.cssText = 'padding:10px; font-weight:700; color:#037a3f; font-family:monospace; width:180px; min-width:180px;';
+    tdOrderId.textContent = orderId;
+    
+    // 주문일 셀
+    const tdDate = document.createElement('td');
+    tdDate.style.cssText = 'padding:10px; font-size:12px; width:180px; min-width:180px;';
+    tdDate.textContent = createdDate;
+    
+    // 주문자 셀
+    const tdUser = document.createElement('td');
+    tdUser.style.cssText = 'padding:10px; width:100px; min-width:100px;';
+    tdUser.textContent = userName;
+    
+    // 배송지 셀
+    const tdAddress = document.createElement('td');
+    tdAddress.style.cssText = 'padding:10px; width:200px; min-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+    tdAddress.textContent = userAddress;
+    
+    // 내용 셀
+    const tdItems = document.createElement('td');
+    tdItems.style.cssText = 'padding:10px; width:150px; min-width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;';
+    tdItems.innerHTML = `${personalBadge}<span>${itemSummary}</span>`;
+    
+    // 금액 셀
+    const tdPrice = document.createElement('td');
+    tdPrice.style.cssText = 'padding:10px; width:120px; min-width:120px;';
+    tdPrice.textContent = (order.total_price || 0).toLocaleString() + '원';
+    
+    // 관리 셀
+    const tdManage = document.createElement('td');
+    tdManage.style.cssText = 'padding:10px; text-align:center; width:200px; min-width:200px;';
+    tdManage.innerHTML = `
+      <div style="display:flex; gap:6px; justify-content:center; align-items:center; flex-wrap:wrap;">
+        <span style="padding:4px 10px; background:${statusInfo.color}15; color:${statusInfo.color}; border-radius:0; font-size:11px; font-weight:700;">${statusInfo.text}</span>
+        <button onclick="viewAdminOrderDetail('${orderId}')" style="padding:4px 8px; background:#037a3f; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700;">상세</button>
+        ${order.status === '환불요청' ? `
+          <button onclick="approveRefund('${orderId}')" style="padding:4px 8px; background:#10b981; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700;">환불승인</button>
+          <button onclick="rejectRefund('${orderId}')" style="padding:4px 8px; background:#ef4444; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700;">환불거절</button>
+          ` : order.status === '주문접수' ? `
+            <button onclick="updateAdminOrderStatus('${orderId}', '제작중')" style="padding:4px 8px; background:#3b82f6; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700;">제작</button>
+            <button onclick="updateAdminOrderStatus('${orderId}', '취소')" style="padding:4px 8px; background:#ef4444; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700;">취소</button>
+          ` : order.status === '제작중' ? `
+            <button onclick="updateAdminOrderStatus('${orderId}', '배송중')" style="padding:4px 8px; background:#8b5cf6; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700;">배송</button>
+          ` : order.status === '배송중' ? `
+            <button onclick="updateAdminOrderStatus('${orderId}', '배송완료')" style="padding:4px 8px; background:#10b981; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:11px; font-weight:700;">완료</button>
           ` : ''}
         </div>
-      </td>
     `;
+    
+    tr.appendChild(tdCheck);
+    tr.appendChild(tdOrderId);
+    tr.appendChild(tdDate);
+    tr.appendChild(tdUser);
+    tr.appendChild(tdAddress);
+    tr.appendChild(tdItems);
+    tr.appendChild(tdPrice);
+    tr.appendChild(tdManage);
     body.appendChild(tr);
   });
 }
 
 async function updateAdminOrderStatus(orderId, newStatus) {
   const statusText = {
-    'preparing': '제작중',
-    'shipping': '배송중',
-    'completed': '완료',
-    'cancelled': '취소'
+    '제작중': '제작중',
+    '배송중': '배송중',
+    '배송완료': '배송완료',
+    '취소': '취소'
   }[newStatus] || newStatus;
   
   if (!confirm(`주문을 "${statusText}" 상태로 변경하시겠습니까?`)) return;
@@ -2371,12 +2441,12 @@ function displayOrderDetailModal(order) {
   
   // 상태별 색상 및 텍스트
   const statusMap = {
-    'pending': { color: '#f59e0b', text: '접수' },
-    'preparing': { color: '#3b82f6', text: '준비중' },
-    'shipping': { color: '#8b5cf6', text: '배송출발' },
-    'completed': { color: '#10b981', text: '완료' },
-    'refund_requested': { color: '#f97316', text: '환불요청' },
-    'refunded': { color: '#6b7280', text: '환불완료' }
+    '주문접수': { color: '#f59e0b', text: '접수' },
+    '제작중': { color: '#3b82f6', text: '준비중' },
+    '배송중': { color: '#8b5cf6', text: '배송출발' },
+    '배송완료': { color: '#10b981', text: '완료' },
+    '환불요청': { color: '#f97316', text: '환불요청' },
+    '환불완료': { color: '#6b7280', text: '환불완료' }
   };
   
   const statusInfo = statusMap[order.status] || { color: '#64748b', text: order.status || '대기' };
@@ -2402,20 +2472,27 @@ function displayOrderDetailModal(order) {
   let itemsDetail = '';
   let isPersonalPay = false;
   
+  console.log('[displayOrderDetailModal] order.items 확인:');
+  console.log('  - 타입:', typeof order.items);
+  console.log('  - 값:', order.items);
+  console.log('  - Array.isArray:', Array.isArray(order.items));
+  
   if (order.items) {
     if (typeof order.items === 'string') {
       try {
         items = JSON.parse(order.items);
-        console.log('파싱된 items:', items);
+        console.log('[displayOrderDetailModal] 문자열 파싱 성공:', items);
       } catch (e) {
-        console.error('items 파싱 오류:', e);
+        console.error('[displayOrderDetailModal] items 파싱 오류:', e);
         items = [];
       }
     } else if (Array.isArray(order.items)) {
       items = order.items;
-      console.log('items가 이미 배열:', items);
+      console.log('[displayOrderDetailModal] items가 이미 배열:', items);
     }
   }
+  
+  console.log('[displayOrderDetailModal] 최종 items:', items, 'length:', items.length);
   
   if (Array.isArray(items) && items.length > 0) {
     itemSummary = items.length === 1 
@@ -2463,110 +2540,121 @@ function displayOrderDetailModal(order) {
     } else {
       // 일반 주문: 기존 상세 옵션 표시
       items.forEach((item, idx) => {
-        console.log(`아이템 ${idx + 1}:`, item);
-        console.log(`아이템 ${idx + 1} options:`, item.options);
-        
-        const opts = item.options || {};
-        const qtyText = (() => {
-          if (!opts.qty) return '';
-          const qtyStr = String(opts.qty).trim();
-          // 괄호 제거, 중복 단위 제거 (권권, 부부, 권부, 부권 등)
-          const cleaned = qtyStr.replace(/[()]/g, '').replace(/권권|부부|권부|부권/g, '').trim();
-          // 이미 한글 단위가 있으면 그대로, 없으면 부 추가
-          if (/[가-힣]$/.test(cleaned)) return cleaned;
-          const numMatch = cleaned.match(/^(\d+)/);
-          return numMatch ? `${numMatch[1]}부` : cleaned;
-        })();
-        
-        itemsDetail += `
-          <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
-            <div style="font-size:16px; font-weight:700; color:#0f172a; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #037a3f;">
-              📦 ${stripQtyFromName(item.name) || '상품'}${items.length > 1 ? ` (${idx + 1})` : ''}
-            </div>
-            
-            ${opts.qty ? `
-              <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; padding:12px; background:#f0fdf4; border-radius:6px; border-left:3px solid #037a3f;">
-                <span style="font-size:14px; color:#64748b;">수량:</span>
-                <span style="color:#037a3f; font-size:18px; font-weight:700;">${qtyText}</span>
-              </div>
-            ` : ''}
-            
-            <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
-              <div style="background:#fafafa; padding:14px; border-radius:6px;">
-                <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📘 표지</div>
-                ${opts.coverType ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">용지: <strong>${opts.coverType}${opts.coverGram ? ' ' + opts.coverGram : ''}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">용지: 미선택</div>'}
-                ${opts.coverPages ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">페이지: <strong>${opts.coverPages}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">페이지: 미선택</div>'}
-                ${opts.coverPrint ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">인쇄: <strong>${opts.coverPrint}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">인쇄: 미선택</div>'}
-                ${opts.coverColor ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">색상: <strong>${opts.coverColor === 'color' ? '컬러' : '흑백'}</strong></div>` : ''}
-                ${(() => {
-                  const coatMap = {
-                    'none': '코팅없음',
-                    '0': '코팅없음',
-                    '코팅없음': '코팅없음',
-                    'matte': '무광코팅',
-                    'matt': '무광코팅',
-                    '1': '무광코팅',
-                    '단면무광코팅': '무광코팅',
-                    'gloss': '유광코팅',
-                    'glossy': '유광코팅',
-                    '3': '유광코팅',
-                    '단면유광코팅': '유광코팅'
-                  };
-                  const label = coatMap[opts.coating] || opts.coating;
-                  return opts.coating
-                    ? `<div style="font-size:13px; color:#334155;">코팅: <strong>${label}</strong></div>`
-                    : '<div style="font-size:13px; color:#94a3b8;">코팅: 미선택</div>';
-                })()}
+        try {
+          console.log(`아이템 ${idx + 1}:`, item);
+          console.log(`아이템 ${idx + 1} options:`, item.options);
+          
+          const opts = item.options || {};
+          const qtyText = (() => {
+            if (!opts.qty) return '';
+            const qtyStr = String(opts.qty).trim();
+            // 괄호 제거, 중복 단위 제거 (권권, 부부, 권부, 부권 등)
+            const cleaned = qtyStr.replace(/[()]/g, '').replace(/권권|부부|권부|부권/g, '').trim();
+            // 이미 한글 단위가 있으면 그대로, 없으면 부 추가
+            if (/[가-힣]$/.test(cleaned)) return cleaned;
+            const numMatch = cleaned.match(/^(\d+)/);
+            return numMatch ? `${numMatch[1]}부` : cleaned;
+          })();
+          
+          const productName = stripQtyFromName(item.name) || '상품';
+          
+          itemsDetail += `
+            <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+              <div style="font-size:16px; font-weight:700; color:#0f172a; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #e2e8f0;">
+                📦 ${escapeHtml(productName)}${items.length > 1 ? ` (${idx + 1})` : ''}
               </div>
               
-              <div style="background:#fafafa; padding:14px; border-radius:6px;">
-                <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📄 내지</div>
-                ${opts.innerType ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">용지: <strong>${opts.innerType}${opts.innerGram ? ' ' + opts.innerGram : ''}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">용지: 미선택</div>'}
-                ${opts.innerPages ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">페이지: <strong>${opts.innerPages}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">페이지: 미선택</div>'}
-                ${opts.innerPrint ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">인쇄: <strong>${opts.innerPrint}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">인쇄: 미선택</div>'}
-                ${opts.innerColor ? `<div style="font-size:13px; color:#334155;">색상: <strong>${opts.innerColor === 'color' ? '컬러' : '흑백'}</strong></div>` : ''}
-              </div>
+              ${opts.qty ? `
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; padding:12px; background:#f8fafc; border-radius:6px;">
+                  <span style="font-size:14px; color:#64748b;">수량:</span>
+                  <span style="color:#0f172a; font-size:18px; font-weight:700;">${escapeHtml(qtyText)}</span>
+                </div>
+              ` : ''}
               
-              <div style="background:#fafafa; padding:14px; border-radius:6px;">
-                <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📌 제본</div>
-                ${opts.binding ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">방식: <strong>${opts.binding === 'staple' ? '중철' : opts.binding === 'perfect' ? '무선' : opts.binding}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">방식: 미선택</div>'}
-                ${opts.bindingDirection ? `<div style="font-size:14px; color:#037a3f; font-weight:700;">방향: ${opts.bindingDirection}</div>` : '<div style="font-size:13px; color:#94a3b8;">방향: 미선택</div>'}
+              <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;">
+                <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                  <div style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:10px;">📘 표지</div>
+                  ${opts.coverType ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">용지: <strong>${escapeHtml(opts.coverType)}${opts.coverGram ? ' ' + opts.coverGram : ''}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">용지: 미선택</div>'}
+                  ${opts.coverPages ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">페이지: <strong>${escapeHtml(opts.coverPages)}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">페이지: 미선택</div>'}
+                  ${opts.coverPrint ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">인쇄: <strong>${escapeHtml(opts.coverPrint)}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">인쇄: 미선택</div>'}
+                  ${opts.coverColor ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">색상: <strong>${opts.coverColor === 'color' ? '컬러' : '흑백'}</strong></div>` : ''}
+                  ${getCoatingLabel(opts.coating) ? `<div style="font-size:13px; color:#334155;">코팅: <strong>${getCoatingLabel(opts.coating)}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">코팅: 미선택</div>'}
+                </div>
+                
+                <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                  <div style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:10px;">📄 내지</div>
+                  ${opts.innerType ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">용지: <strong>${escapeHtml(opts.innerType)}${opts.innerGram ? ' ' + opts.innerGram : ''}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">용지: 미선택</div>'}
+                  ${opts.innerPages ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">페이지: <strong>${escapeHtml(opts.innerPages)}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">페이지: 미선택</div>'}
+                  ${opts.innerPrint ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">인쇄: <strong>${escapeHtml(opts.innerPrint)}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">인쇄: 미선택</div>'}
+                  ${opts.innerColor ? `<div style="font-size:13px; color:#334155;">색상: <strong>${opts.innerColor === 'color' ? '컬러' : '흑백'}</strong></div>` : ''}
+                </div>
+                
+                <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                  <div style="font-size:13px; font-weight:700; color:#0f172a; margin-bottom:10px;">📌 제본</div>
+                  ${opts.binding ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">방식: <strong>${opts.binding === 'staple' ? '중철' : opts.binding === 'perfect' ? '무선' : escapeHtml(opts.binding)}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">방식: 미선택</div>'}
+                  ${opts.bindingDirection ? `<div style="font-size:14px; color:#0f172a; font-weight:700;">방향: ${escapeHtml(opts.bindingDirection)}</div>` : '<div style="font-size:13px; color:#94a3b8;">방향: 미선택</div>'}
+                </div>
               </div>
             </div>
-          </div>
-        `;
+          `;
+        } catch (e) {
+          console.error(`아이템 ${idx + 1} 렌더링 오류:`, e);
+          itemsDetail += `<div style="padding:10px; background:#fef3c7; color:#92400e; border-radius:0;">⚠️ 아이템 렌더링 실패: ${escapeHtml(e.message)}</div>`;
+        }
       });
     }
   } else {
     console.log('items가 비어있거나 배열이 아님');
-    itemsDetail = '<div style="padding:20px; text-align:center; color:#94a3b8;">주문 상세 정보가 없습니다.</div>';
+    console.log('items 타입:', typeof items, '배열여부:', Array.isArray(items), '길이:', items ? items.length : 'null');
+    console.log('orderDetails 확인:', orderDetails);
+    
+    // items가 없으면 orderDetails에서 정보를 추출하여 표시
+    if (orderDetails && Object.keys(orderDetails).length > 0) {
+      itemsDetail = `
+        <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0;">
+          <div style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:12px; padding-bottom:12px; border-bottom:2px solid #e2e8f0;">
+            📋 주문 상세 정보
+          </div>
+          <div style="font-size:13px; color:#334155; line-height:1.8;">
+            <div style="margin-bottom:8px;"><strong>상품 금액:</strong> ${(order.total_price || 0).toLocaleString()}원</div>
+            ${orderDetails.finalPrice ? `<div style="margin-bottom:8px;"><strong>최종 견적가:</strong> ${(orderDetails.finalPrice || 0).toLocaleString()}원</div>` : ''}
+            ${orderDetails.marginPercent ? `<div style="margin-bottom:8px;"><strong>마진:</strong> ${orderDetails.marginPercent}%</div>` : ''}
+          </div>
+        </div>
+      `;
+    } else {
+      itemsDetail = '<div style="padding:20px; text-align:center; color:#ef4444; background:#fef3c7; border:1px solid #fcd34d; border-radius:0;">⚠️ 주문 상세 정보가 없습니다.</div>';
+    }
   }
   
   console.log('최종 itemsDetail 길이:', itemsDetail.length);
   console.log('itemsDetail:', itemsDetail);
 
+  const debugInfo = `
+    <div style="background:#fff3cd; border:1px solid #ffc107; padding:10px; margin-bottom:10px; border-radius:0; font-size:11px; color:#333;">
+      <strong>📋 디버그 정보:</strong><br>
+      Items 길이: ${Array.isArray(items) ? items.length : '파싱 실패'}<br>
+      OrderDetails 키: ${orderDetails ? Object.keys(orderDetails).join(', ') : '없음'}
+    </div>
+  `;
+
   const detailHtml = `
-    <div style="max-width:700px; margin:0 auto;">
-      <h3 style="margin:0 0 20px 0; font-weight:1100; color:#0f172a;">주문 상세 정보</h3>
+    <div style="max-width:600px; margin:0 auto;">
+      <h3 style="margin:0 0 20px 0; font-weight:1100; color:#0f172a;">주문 상세</h3>
+      ${debugInfo}
       
-      <div style="background:#fff; border:1px solid var(--line); border-radius:0; padding:24px; margin-bottom:16px;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; padding-bottom:16px; border-bottom:2px solid #e2e8f0;">
+      <div style="background:#fff; border:2px solid #e2e8f0; padding:24px; margin-bottom:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:16px; border-bottom:2px solid #e2e8f0;">
           <div>
             <div style="font-weight:900; font-size:18px; color:#0f172a; margin-bottom:8px;">${order.user_id || '비회원'}</div>
             <div style="font-size:13px; color:#64748b;">주문번호: ${orderId}</div>
-            <div style="font-size:13px; color:#64748b; margin-top:4px;">주문일: ${createdDate}</div>
           </div>
-          <span style="padding:6px 16px; background:${statusInfo.color}15; color:${statusInfo.color}; border-radius:8px; font-size:13px; font-weight:700;">${statusInfo.text}</span>
+          <span style="padding:6px 16px; background:${statusInfo.color}15; color:${statusInfo.color}; font-size:13px; font-weight:700;">${statusInfo.text}</span>
         </div>
         
         <div style="margin-bottom:16px;">
-          <div style="font-size:12px; color:#64748b; margin-bottom:8px; font-weight:600;">상태 변경</div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button onclick="updateOrderStatus('${orderId}', 'pending')" style="padding:8px 12px; background:${order.status === 'pending' ? '#f59e0b' : '#e2e8f0'}; color:${order.status === 'pending' ? '#fff' : '#475569'}; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">접수</button>
-            <button onclick="updateOrderStatus('${orderId}', 'preparing')" style="padding:8px 12px; background:${order.status === 'preparing' ? '#3b82f6' : '#e2e8f0'}; color:${order.status === 'preparing' ? '#fff' : '#475569'}; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">준비중</button>
-            <button onclick="updateOrderStatus('${orderId}', 'shipping')" style="padding:8px 12px; background:${order.status === 'shipping' ? '#8b5cf6' : '#e2e8f0'}; color:${order.status === 'shipping' ? '#fff' : '#475569'}; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">배송출발</button>
-            <button onclick="updateOrderStatus('${orderId}', 'completed')" style="padding:8px 12px; background:${order.status === 'completed' ? '#10b981' : '#e2e8f0'}; color:${order.status === 'completed' ? '#fff' : '#475569'}; border:none; border-radius:6px; font-size:12px; font-weight:600; cursor:pointer;">완료</button>
-          </div>
+          <div style="font-size:12px; color:#64748b; margin-bottom:6px;">주문일시</div>
+          <div style="font-size:14px; color:#0f172a; font-weight:600;">${createdDate}</div>
         </div>
         
         <div style="margin-bottom:16px; padding-top:16px; border-top:1px solid #e2e8f0;">
@@ -2579,15 +2667,42 @@ function displayOrderDetailModal(order) {
           ${itemsDetail}
         </div>
         
+        <div style="padding-top:16px; border-top:2px solid #e2e8f0; margin-top:16px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
+            <span style="font-size:14px; color:#64748b;">상품금액</span>
+            <span style="font-size:14px; color:#0f172a; font-weight:700;">${(order.total_price || 0).toLocaleString()}원</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; padding-top:12px; border-top:1px dashed #e2e8f0; margin-top:12px;">
+            <span style="font-size:16px; color:#0f172a; font-weight:900;">총 금액</span>
+            <span style="font-size:20px; color:var(--primary); font-weight:1100;">${(order.total_price || 0).toLocaleString()}원</span>
+          </div>
+        </div>
+        
+        ${order.status === '배송중' ? `
+        <div style="margin-top:16px; padding:16px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:0;">
+          <div style="font-size:13px; font-weight:700; color:#047857; margin-bottom:12px;">🚚 배송 정보</div>
+          <div style="display:flex; gap:8px; margin-bottom:8px;">
+            <input type="text" id="shipping-number-input" placeholder="송장번호 입력" value="${order.tracking_number || ''}" style="flex:1; padding:8px 10px; border:1px solid #a7f3d0; border-radius:0; font-size:13px;">
+            <button onclick="updateShippingNumber('${orderId}')" style="padding:8px 16px; background:#047857; color:#fff; border:none; border-radius:0; cursor:pointer; font-weight:700; font-size:13px;">저장</button>
+          </div>
+          ${order.tracking_number ? `
+          <div style="display:flex; gap:8px; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid #a7f3d0;">
+            <span style="font-size:13px; color:#334155;">송장번호: <strong>${order.tracking_number}</strong></span>
+            <button onclick="trackShipment('${order.tracking_number}')" style="padding:4px 12px; background:#0891b2; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:12px; font-weight:600;">배송조회</button>
+          </div>
+          ` : ''}
+        </div>
+        ` : ''}
+        
         ${orderDetails && typeof orderDetails === 'object' && Object.keys(orderDetails).length > 0 ? `
-        <div style="margin-bottom:16px; padding:16px; background:#f0fdf4; border-radius:8px; border-left:4px solid #037a3f;">
-          <div style="font-size:14px; font-weight:700; color:#037a3f; margin-bottom:12px;">📋 견적 상세 내역</div>
+        <div style="margin-top:16px; padding:16px; background:#f8fafc; border-radius:0;">
+          <div style="font-size:14px; font-weight:700; color:#0f172a; margin-bottom:12px;">📋 견적 상세 내역</div>
           ${(() => {
             const details = orderDetails;
             let html = '';
             
             if (details.cover) {
-              html += '<div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:6px;">';
+              html += '<div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:0;">';
               html += '<div style="font-size:12px; font-weight:700; color:#037a3f; margin-bottom:8px;">표지 비용</div>';
               html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:12px;">';
               html += '<div>종이비: <strong>' + (details.cover.paper || 0).toLocaleString() + '원</strong></div>';
@@ -2600,7 +2715,7 @@ function displayOrderDetailModal(order) {
             }
             
             if (details.inner) {
-              html += '<div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:6px;">';
+              html += '<div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:0;">';
               html += '<div style="font-size:12px; font-weight:700; color:#0f7ba7; margin-bottom:8px;">내지 비용</div>';
               html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; font-size:12px;">';
               html += '<div>종이비: <strong>' + (details.inner.paper || 0).toLocaleString() + '원</strong></div>';
@@ -2614,7 +2729,7 @@ function displayOrderDetailModal(order) {
             }
             
             if (details.bind) {
-              html += '<div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:6px;">';
+              html += '<div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:0;">';
               html += '<div style="font-size:12px; font-weight:700; color:#f59e0b; margin-bottom:8px;">제본 비용</div>';
               html += '<div style="font-size:12px;">제본비: <strong>' + (details.bind.cost || 0).toLocaleString() + '원</strong></div>';
               if (details.bind.msg) html += '<div style="font-size:11px; color:#64748b; margin-top:4px;">' + details.bind.msg + '</div>';
@@ -2622,7 +2737,7 @@ function displayOrderDetailModal(order) {
             }
             
             if (details.shipping) {
-              html += '<div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:6px;">';
+              html += '<div style="margin-bottom:12px; padding:10px; background:#fff; border-radius:0;">';
               html += '<div style="font-size:12px; font-weight:700; color:#8b5cf6; margin-bottom:8px;">배송 비용</div>';
               html += '<div style="font-size:12px;">배송비: <strong>' + (details.shipping.cost || 0).toLocaleString() + '원</strong></div>';
               html += '<div style="font-size:11px; color:#64748b; margin-top:4px;">' + details.shipping.boxName + ' ' + details.shipping.boxes + '개</div>';
@@ -2631,7 +2746,7 @@ function displayOrderDetailModal(order) {
             
             // 마진, 부가세, 공급가액 표시 (순서: 마진 → 부가세 → 공급가액)
             if (details.supplyPrice) {
-              html += '<div style="margin-top:16px; padding:10px; background:#fff; border-radius:6px; border-top:2px solid #e2e8f0;">';
+              html += '<div style="margin-top:16px; padding:10px; background:#fff; border-radius:0; border-top:2px solid #e2e8f0;">';
               if (typeof details.marginAmount === 'number' && typeof details.marginPercent === 'number') {
                 html += '<div style="display:flex; justify-content:space-between; margin-bottom:8px;">';
                 html += '<span style="font-size:12px; color:#64748b;">마진 (' + details.marginPercent + '%)</span>';
@@ -2655,44 +2770,43 @@ function displayOrderDetailModal(order) {
           })()}
           
           ${(orderDetails && orderDetails.finalPrice) ? `
-          <div style="padding:12px; background:#fff; border-radius:6px; border:2px solid #037a3f;">
+          <div style="padding:12px; background:#fff; border-radius:0; border:2px solid #e2e8f0; margin-top:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <span style="font-size:13px; font-weight:700; color:#0f172a;">최종 견적가</span>
-              <span style="font-size:18px; font-weight:900; color:#037a3f;">${(orderDetails.finalPrice || 0).toLocaleString()}원</span>
+              <span style="font-size:18px; font-weight:900; color:#0f172a;">${(orderDetails.finalPrice || 0).toLocaleString()}원</span>
             </div>
             ${orderDetails.perUnitPrice ? '<div style="text-align:right; font-size:12px; color:#64748b; margin-top:4px;">권당: ' + orderDetails.perUnitPrice.toLocaleString() + '원</div>' : ''}
           </div>
           ` : ''}
         </div>
         ` : `
-        <div style="margin-bottom:16px; padding:16px; background:#fef3c7; border-radius:8px; border-left:4px solid #f59e0b;">
+        <div style="margin-top:16px; padding:16px; background:#fef3c7; border-radius:0; border-left:4px solid #f59e0b;">
           <div style="font-size:13px; font-weight:700; color:#b45309; margin-bottom:8px;">⚠️ 견적 상세 정보 없음</div>
           <div style="font-size:12px; color:#92400e;">이 주문은 견적 상세 계산 정보가 저장되지 않았습니다. 주문 정보에서 옵션을 확인하세요.</div>
         </div>
         `}
         
-        <div style="padding-top:16px; border-top:2px solid #e2e8f0; margin-top:16px;">
-          <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-            <span style="font-size:14px; color:#64748b;">상품금액</span>
-            <span style="font-size:14px; color:#0f172a; font-weight:700;">${(order.total_price || 0).toLocaleString()}원</span>
-          </div>
-          <div style="display:flex; justify-content:space-between; padding-top:12px; border-top:1px dashed #e2e8f0; margin-top:12px;">
-            <span style="font-size:16px; color:#0f172a; font-weight:900;">총 금액</span>
-            <span style="font-size:20px; color:var(--primary); font-weight:1100;">${(order.total_price || 0).toLocaleString()}원</span>
+        <div style="margin-top:16px; padding:16px; border-top:2px solid #e2e8f0; background:#fff;">
+          <div style="font-size:12px; color:#64748b; margin-bottom:8px; font-weight:600;">상태 변경</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button onclick="updateOrderStatus('${orderId}', '주문접수')" style="padding:8px 12px; background:${order.status === '주문접수' ? '#f59e0b' : '#e2e8f0'}; color:${order.status === '주문접수' ? '#fff' : '#475569'}; border:none; border-radius:0; font-size:12px; font-weight:600; cursor:pointer;">접수</button>
+            <button onclick="updateOrderStatus('${orderId}', '제작중')" style="padding:8px 12px; background:${order.status === '제작중' ? '#3b82f6' : '#e2e8f0'}; color:${order.status === '제작중' ? '#fff' : '#475569'}; border:none; border-radius:0; font-size:12px; font-weight:600; cursor:pointer;">준비중</button>
+            <button onclick="updateOrderStatus('${orderId}', '배송중')" style="padding:8px 12px; background:${order.status === '배송중' ? '#8b5cf6' : '#e2e8f0'}; color:${order.status === '배송중' ? '#fff' : '#475569'}; border:none; border-radius:0; font-size:12px; font-weight:600; cursor:pointer;">배송출발</button>
+            <button onclick="updateOrderStatus('${orderId}', '배송완료')" style="padding:8px 12px; background:${order.status === '배송완료' ? '#10b981' : '#e2e8f0'}; color:${order.status === '배송완료' ? '#fff' : '#475569'}; border:none; border-radius:0; font-size:12px; font-weight:600; cursor:pointer;">완료</button>
           </div>
         </div>
       </div>
       
-      ${order.status === 'refund_requested' ? `
-        <div style="padding:12px; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; margin-bottom:12px; text-align:center; color:#92400e; font-weight:600;">
+      ${order.status === '환불요청' ? `
+        <div style="padding:12px; background:#fef3c7; border:1px solid #f59e0b; border-radius:0; margin-bottom:12px; text-align:center; color:#92400e; font-weight:600;">
           ⚠️ 고객이 환불을 요청하였습니다.
         </div>
         <div style="display:flex; gap:12px; margin-bottom:12px;">
-          <button id="approve-refund-btn" class="btn" style="flex:1; background:#10b981; color:#fff; border:none; padding:12px; font-weight:700; cursor:pointer;">환불 승인</button>
-          <button id="reject-refund-btn" class="btn" style="flex:1; background:#ef4444; color:#fff; border:none; padding:12px; font-weight:700; cursor:pointer;">환불 거절</button>
+          <button id="approve-refund-btn" class="btn" style="flex:1; background:#10b981; color:#fff; border:none; padding:12px; font-weight:700; cursor:pointer; border-radius:0;">환불 승인</button>
+          <button id="reject-refund-btn" class="btn" style="flex:1; background:#ef4444; color:#fff; border:none; padding:12px; font-weight:700; cursor:pointer; border-radius:0;">환불 거절</button>
         </div>
       ` : ''}
-      <button id="close-order-modal-btn" class="btn btn-primary" style="width:100%;">닫기</button>
+      <button id="close-order-modal-btn" class="btn btn-primary" style="width:100%; border-radius:0; padding:12px; background:var(--primary); color:#fff; border:none; font-weight:700; cursor:pointer;">닫기</button>
     </div>
   `;
 
@@ -2700,7 +2814,7 @@ function displayOrderDetailModal(order) {
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:2000; padding:20px; overflow-y:auto;';
   modal.innerHTML = `
-    <div style="background:#fff; border-radius:0; padding:24px; max-width:800px; width:100%; max-height:90vh; overflow-y:auto;">
+    <div style="background:#fff; border-radius:0; padding:24px; max-width:600px; width:100%; max-height:90vh; overflow-y:auto;">
       ${detailHtml}
     </div>
   `;
@@ -3190,51 +3304,29 @@ async function addToCartFromQuote() {
       else coatingValue = options.coating;
     }
 
-    const calcDetails = calculateAndSaveQuoteDetails_111({
-      size: sizeValue,
-      qty: qtyValue,
-      margin: options.margin || 0,
-      innerPages: innerPagesValue,
-      bindType: options.bindType || options.binding || 'perfect',
-      mode: options.mode || 'book_indigo',
-      coating: coatingValue,
-      coverType: options.coverType || '모조지',
-      coverGram: coverGramValue,
-      coverDetail: coverDetail,
-      innerType: options.innerType || '모조지',
-      innerGram: innerGramValue,
-      innerDetail: innerDetail
-    });
+    // 111 함수 제거: 백엔드에서 계산한 결과(sum-supply 등)를 직접 사용
+    // const calcDetails = calculateAndSaveQuoteDetails_111({...});
     
-    console.log('[파이프 검증] addToCartFromQuote - calcDetails 생성:', {
-      cover: calcDetails?.cover,
-      inner: calcDetails?.inner,
-      bind: calcDetails?.bind,
-      shipping: calcDetails?.shipping,
-      finalPrice: calcDetails?.finalPrice
-    });
-
-    // 화면에 표시된 요약 금액을 우선 신뢰해 가격 차이를 없앤다
+    // 화면에 표시된 백엔드 계산 결과를 사용
     const shownSupply = parseInt((get('sum-supply')?.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
     const shownVat = parseInt((get('sum-vat')?.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
     const shownShip = parseInt((get('sum-ship')?.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
     const shownTotal = parseInt((get('sum-total')?.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
 
-    shipCost = shownShip || calcDetails?.shipping?.cost || 0;
-    const finalFromCalc = calcDetails?.finalPrice || shownTotal || totalPrice;
-    // 장바구니 상품가는 최종가에서 배송비를 뺀 값으로 저장 (표시값 기준)
+    shipCost = shownShip || 0;
+    const finalFromCalc = shownTotal || totalPrice;
+    // 장바구니 상품가는 최종가에서 배송비를 뺀 값으로 저장
     itemPriceExShip = Math.max(0, shownTotal ? (shownTotal - shipCost) : (finalFromCalc - shipCost));
 
-    // admin breakdown 일치를 위해 계산된 상세를 아이템에도 저장하되, 화면 표시값으로 보정
-    if (calcDetails) {
-      calcDetails.finalPrice = shownTotal || finalFromCalc;
-      calcDetails.supplyPrice = shownSupply || calcDetails.supplyPrice;
-      calcDetails.vat = shownVat || calcDetails.vat;
-      calcDetails.shipping = calcDetails.shipping || {};
-      calcDetails.shipping.cost = shipCost;
-      const qtyForUnit = qtyValue || 0;
-      if (qtyForUnit > 0) calcDetails.perUnitPrice = Math.round(calcDetails.finalPrice / qtyForUnit);
-      options._calcDetails = calcDetails;
+    // 백엔드 계산 결과를 옵션에 저장
+    if (shownTotal > 0) {
+      options._calcDetails = {
+        finalPrice: shownTotal,
+        supplyPrice: shownSupply,
+        vat: shownVat,
+        shipping: { cost: shipCost },
+        perUnitPrice: Math.round(shownTotal / (qtyValue || 1))
+      };
     }
   } catch (e) {
     console.warn('장바구니 배송/금액 계산 실패:', e);
@@ -3280,11 +3372,24 @@ async function addToCartFromQuote() {
   }
 
   cart.push({
+    category: cat,  // ← 추가됨
     name: `${cat} (${qty})`,
     qty: qty,
     price: itemPriceExShip,
     shipping: shipCost,
-    specs: `카테고리: ${cat}, 수량: ${qty}`,
+    specs: {
+      size: options.size || 'A4',
+      inner_pages: parseInt(options.innerPages || 4, 10),
+      cover_type: options.coverType || '모조지',
+      cover_gram: parseInt(options.coverGram || 100, 10),
+      inner_type: options.innerType || '모조지',
+      inner_gram: parseInt(options.innerGram || 80, 10),
+      bind_type: options.binding || 'perfect',
+      cover_color: options.coverPrint?.includes('컬러') ? 'color' : 'mono',
+      inner_color: options.innerPrint?.includes('컬러') ? 'color' : 'mono',
+      coating: options.coating || '0',
+      cover_page: 4
+    },
     options: options,
     files: filesWithData,
     fileInfo: fileInfo,
@@ -3442,29 +3547,21 @@ async function orderDirectlyFromQuote() {
       else coatingValue = options.coating;
     }
     
-    orderDetails = calculateAndSaveQuoteDetails_111({
-      size: sizeValue,
-      qty: qtyValue,
-      margin: options.margin || 0,
-      innerPages: innerPagesValue,
-      bindType: options.bindType || options.binding || 'perfect',
-      mode: options.mode || 'book_indigo',
-      coating: coatingValue,
-      coverType: options.coverType || '모조지',
-      coverGram: coverGramValue,
-      coverDetail: coverDetail,
-      innerType: options.innerType || '모조지',
-      innerGram: innerGramValue,
-      innerDetail: innerDetail
-    });
-    
-    console.log('[파이프 검증] orderDirectlyFromQuote - orderDetails 생성:', {
-      cover: orderDetails?.cover,
-      inner: orderDetails?.inner,
-      bind: orderDetails?.bind,
-      shipping: orderDetails?.shipping,
-      finalPrice: orderDetails?.finalPrice
-    });
+    // 111 함수 제거: 주문 저장은 장바구니에서 가져온 _calcDetails 또는 기본값 사용
+    if (!orderDetails || Object.keys(orderDetails).length === 0) {
+      const shownTotal = parseInt((get('sum-total')?.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const shownSupply = parseInt((get('sum-supply')?.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const shownVat = parseInt((get('sum-vat')?.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
+      const shownShip = parseInt((get('sum-ship')?.textContent || '').replace(/[^0-9]/g, ''), 10) || 0;
+      
+      orderDetails = {
+        finalPrice: shownTotal,
+        supplyPrice: shownSupply,
+        vat: shownVat,
+        shipping: { cost: shownShip },
+        perUnitPrice: Math.round(shownTotal / (qtyValue || 1))
+      };
+    }
   } catch (e) {
     console.warn('직주문 상세 계산 정보 생성 실패:', e);
     console.error(e);
@@ -3493,11 +3590,24 @@ async function orderDirectlyFromQuote() {
   const itemPriceExShip = Math.max(0, finalPrice - shipCost);
 
   const orderItem = {
+    category: cat,  // ← 추가됨
     name: `${cat} (${qty})`,
     qty: qty,
     price: itemPriceExShip,
     shipping: shipCost,
-    specs: `카테고리: ${cat}, 수량: ${qty}`,
+    specs: {
+      size: options.size || 'A4',
+      inner_pages: parseInt(options.innerPages || 4, 10),
+      cover_type: options.coverType || '모조지',
+      cover_gram: parseInt(options.coverGram || 100, 10),
+      inner_type: options.innerType || '모조지',
+      inner_gram: parseInt(options.innerGram || 80, 10),
+      bind_type: options.binding || 'perfect',
+      cover_color: options.coverPrint?.includes('컬러') ? 'color' : 'mono',
+      inner_color: options.innerPrint?.includes('컬러') ? 'color' : 'mono',
+      coating: options.coating || '0',
+      cover_page: 4
+    },
     options: options,
     files: filesWithData,
     fileInfo: fileInfo,
@@ -3541,7 +3651,7 @@ async function orderDirectlyFromQuote() {
       },
       body: JSON.stringify({
         ...tempDirectOrderData,
-        status: 'pending' // [Fix] 미결제 상태로 생성
+        status: '주문접수' // 주문 접수 상태로 생성
       })
     });
 
@@ -3634,18 +3744,12 @@ function updatePaymentProcessingMessage(title, message, isComplete = false) {
   
   if (isComplete) {
     // 결제 완료 표시
-    if (iconEl) {
-      iconEl.textContent = '✅';
-      iconEl.style.animation = 'none'; // 회전 멈추기
-    }
+    if (iconEl) iconEl.textContent = '✅';
     if (noteEl) noteEl.textContent = '';
     overlay.style.background = 'rgba(0, 0, 0, 0.7)'; // 유지
   } else {
     // 대기 중 표시
-    if (iconEl) {
-      iconEl.textContent = '⏳';
-      iconEl.style.animation = 'spin 2s linear infinite'; // 회전 시작
-    }
+    if (iconEl) iconEl.textContent = '⏳';
     if (noteEl) noteEl.textContent = '이 창을 닫지 마세요.';
   }
 }
@@ -3677,135 +3781,136 @@ function monitorPaymentWindow(payappWindow) {
         
         // [Fix] 홈페이지로 가지 않고 "결제 확인 중..." 상태 유지
         updatePaymentProcessingMessage(
-          '⏳ 결제 처리 중입니다',
-          '<strong>팝업이 자동으로 닫혀야 합니다.</strong><br><br>만약 팝업이 닫혀있지 않으면:<br>1. 팝업 우측 상단 X 버튼을 클릭하여 닫아주세요<br>2. 자동으로 결제 결과를 확인하게 됩니다',
+          '결제 처리 중입니다',
+          '결제 결과를 확인하는 중입니다.<br>잠시만 기다려주세요.',
           false
         );
         
-        // [Fix] 팝업 닫힘 시 서버의 현재 주문 상태 확인
+        // [Fix] 신호 도착까지 계속 폴링 (고정 3초가 아님)
         const deleteOrderId = sessionStorage.getItem('pendingOrderId') ||
                               sessionStorage.getItem('pendingPaymentLinkOrderId');
-        console.log('[monitorPaymentWindow] 팝업 닫힘 - 주문ID:', deleteOrderId);
+        console.log('[monitorPaymentWindow] 미결제 주문ID:', deleteOrderId);
         
-        if (deleteOrderId) {
-          try {
-            const token = getToken();
-            console.log('[monitorPaymentWindow] 서버에서 주문 상태 확인 중...');
-            
-            // 1단계: 서버에서 현재 주문 상태 확인
-            const statusRes = await fetch(`/api/orders/${deleteOrderId}`, {
-              method: 'GET',
-              headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (!statusRes.ok) {
-              console.error('[monitorPaymentWindow] 주문 조회 실패:', statusRes.status);
-              hidePaymentProcessing();
-              alert('주문 정보를 조회할 수 없습니다.');
-              sessionStorage.removeItem('pendingOrderId');
-              sessionStorage.removeItem('pendingPaymentLinkOrderId');
-              return;
-            }
-            
-            const orderData = await statusRes.json();
-            console.log('[monitorPaymentWindow] 서버 응답:', orderData);
-            
-            // [Fix] 응답 구조: { success: true, order: {...} }
-            const order = orderData.order;
-            if (!order) {
-              console.error('[monitorPaymentWindow] 주문 데이터 없음');
-              hidePaymentProcessing();
-              alert('주문 정보를 찾을 수 없습니다.');
-              sessionStorage.removeItem('pendingOrderId');
-              sessionStorage.removeItem('pendingPaymentLinkOrderId');
-              return;
-            }
-            
-            console.log('[monitorPaymentWindow] 서버 주문 상태:', order.status, '| mul_no:', order.mul_no);
-            
-            // 2단계: 상태에 따라 처리
-            if (order.status === 'completed' || order.status === 'paid') {
-              // 이미 결제 완료됨 - 모래시계를 ✅로 변경
-              console.log('[monitorPaymentWindow] ✅ 주문이 이미 결제 완료됨 (상태:', order.status + ')');
-              
-              // [Fix] 장바구니 비우기
-              await clearCartEverywhere();
-              console.log('[monitorPaymentWindow] ✅ 장바구니 비움');
-              
-              // [Fix] 팝업 강제 종료 시도
-              try {
-                if (payappWindow && !payappWindow.closed) {
-                  console.log('[monitorPaymentWindow] 팝업 강제 종료 시도 (1차)');
-                  payappWindow.close();
-                }
-              } catch (e) {
-                console.log('[monitorPaymentWindow] 팝업 종료 실패 (크로스 도메인):', e.message);
-              }
-              
-              // returnUrl로 리다이렉트하도록 신호 전송 (이미 PayApp이 처리할 것)
-              console.log('[monitorPaymentWindow] PayApp 자동 리다이렉트 대기 중...');
-              
-              // 모래시계 → ✅로 변경
-              updatePaymentProcessingMessage(
-                '✅ 결제가 완료되었습니다!',
-                `주문번호: ${order.order_code || order.order_id}`,
-                true  // isComplete = true
-              );
-              
-              // [Fix] 팝업 재종료 시도 (강제 종료)
-              setTimeout(() => {
-                try {
-                  if (payappWindow && !payappWindow.closed) {
-                    console.log('[monitorPaymentWindow] 팝업 강제 종료 시도 (2차)');
-                    payappWindow.close();
-                  }
-                } catch (e) {}
-              }, 500);
-              
-              // 2초 후 숨기고 홈으로 이동
-              setTimeout(() => {
-                hidePaymentProcessing();
-                goHome();
-              }, 2000);
-            } else if (order.status === 'pending') {
-              // 아직 미결제 - 취소 신호 전송
-              console.log('[monitorPaymentWindow] 주문이 pending 상태 - 취소 신호 전송');
-              
-              const cancelRes = await fetch(`/api/orders/${deleteOrderId}/cancel`, {
-                method: 'POST',
+        let orderHasMulNo = false;
+        let pollCount = 0;
+        const maxPolls = 120; // 최대 120번 (60초 × 2 = 2분 등)
+        const pollInterval = 500; // 500ms마다 확인
+        
+        // 신호 도착까지 계속 폴링
+        const pollCheckInterval = setInterval(async () => {
+          pollCount++;
+          
+          if (deleteOrderId && pollCount <= maxPolls) {
+            try {
+              const token = getToken();
+              const checkRes = await fetch(`/api/orders/${deleteOrderId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
               });
-              
-              const cancelData = await cancelRes.json();
-              console.log('[monitorPaymentWindow] 취소 응답:', cancelData);
-              
-              if (cancelRes.ok && cancelData.success) {
-                console.log('[monitorPaymentWindow] ✅ 주문 취소 처리 완료');
-                hidePaymentProcessing();
+
+              if (checkRes.ok) {
+                const checkData = await checkRes.json();
+                const order = checkData.order || checkData;
+                
+                if (order && order.mul_no && order.pay_type) {
+                  orderHasMulNo = true;
+                  console.log('[monitorPaymentWindow] ✅ 신호 도착! mul_no=', order.mul_no);
+                  clearInterval(pollCheckInterval);
+                  
+                  // [Fix] 결제 완료 메시지 표시
+                  updatePaymentProcessingMessage(
+                    '✅ 결제가 완료되었습니다!',
+                    '주문을 처리하는 중입니다...',
+                    true
+                  );
+                  
+                  // [Fix] 결제 완료 시 주문 상태를 completed로 업데이트
+                  try {
+                    const updateRes = await fetch(`/api/orders/${deleteOrderId}`, {
+                      method: 'PATCH',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                      },
+                      body: JSON.stringify({ status: 'completed' })
+                    });
+
+                    if (updateRes.ok) {
+                      console.log('[monitorPaymentWindow] ✅ 주문 상태 completed로 업데이트 완료');
+                    }
+                  } catch (e) {
+                    console.error('[monitorPaymentWindow] 주문 상태 업데이트 중 오류:', e);
+                  }
+
+                  // [Fix] 2초 후 완료 화면 표시 및 모래시계 종료
+                  await new Promise(resolve => setTimeout(resolve, 2000));
+                  hidePaymentProcessing();
+                  showOrderComplete({
+                    order_id: deleteOrderId,
+                    order_code: deleteOrderId
+                  });
+                  
+                  return;
+                }
+              }
+            } catch (e) {
+              console.log('[monitorPaymentWindow] 폴링 확인 오류:', e.message);
+            }
+          } else if (pollCount > maxPolls) {
+            // 타임아웃 (120번 × 500ms = 60초)
+            console.log('[monitorPaymentWindow] 폴링 타임아웃 - 결제 확인 실패');
+            clearInterval(pollCheckInterval);
+            hidePaymentProcessing();
+            alert('결제 처리 중에 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+          }
+        }, pollInterval);
+        
+        // [Fix] 폴링 종료 후 결제 미완료 처리
+        // pollCheckInterval이 끝나면 자동으로 진행
+        const checkCompletionInterval = setInterval(async () => {
+          // pollCheckInterval이 끝났는지 확인
+          // (pollCheckInterval이 clear되었으면 진행)
+          if (!orderHasMulNo && pollCount > maxPolls) {
+            clearInterval(checkCompletionInterval);
+            
+            console.log('[monitorPaymentWindow] 결제 미완료 - 주문 삭제:', deleteOrderId);
+            hidePaymentProcessing();
+
+            try {
+              const token = getToken();
+              console.log('[monitorPaymentWindow] 결제 취소: 주문 삭제 시작...');
+
+              const deleteRes = await fetch(`/api/orders/${deleteOrderId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+              });
+
+              console.log('[monitorPaymentWindow] 삭제 응답 상태:', deleteRes.status);
+              const deleteData = await deleteRes.json();
+              console.log('[monitorPaymentWindow] 삭제 응답 데이터:', JSON.stringify(deleteData, null, 2));
+
+              if (deleteRes.ok && deleteData.success) {
+                console.log('[monitorPaymentWindow] ✅ 미결제 주문 삭제 완료');
                 alert('결제가 취소되었습니다.');
               } else {
-                console.error('[monitorPaymentWindow] 취소 처리 실패:', cancelData.message);
-                hidePaymentProcessing();
-                alert('결제 처리 중 오류가 발생했습니다.');
+                console.error('[monitorPaymentWindow] 미결제 주문 삭제 실패:', deleteRes.status, deleteData.message);
+                alert('주문 취소 처리 중 오류가 발생했습니다.');
               }
-            } else {
-              // 다른 상태 (cancelled 등)
-              console.log('[monitorPaymentWindow] 주문 상태:', order.status);
-              hidePaymentProcessing();
-              alert('주문 처리 상태: ' + order.status);
+            } catch (e) {
+              console.error('[monitorPaymentWindow] 주문 삭제 중 오류:', e);
+              alert('주문 취소 처리 중 오류가 발생했습니다.');
             }
-          } catch (e) {
-            console.error('[monitorPaymentWindow] 상태 확인 중 오류:', e);
-            hidePaymentProcessing();
-            alert('결제 처리 중 오류가 발생했습니다.');
+            
+            // sessionStorage 정리
+            sessionStorage.removeItem('pendingOrderId');
+            sessionStorage.removeItem('pendingPaymentLinkOrderId');
           }
-        } else {
-          hidePaymentProcessing();
-        }
+        }, 500);
         
-        // sessionStorage 정리
-        sessionStorage.removeItem('pendingOrderId');
-        sessionStorage.removeItem('pendingPaymentLinkOrderId');
+        // 5분 후 자동 정리 (방어)
+        setTimeout(() => {
+          clearInterval(pollCheckInterval);
+          clearInterval(checkCompletionInterval);
+        }, 5 * 60 * 1000);
       }
     } catch (error) {
       console.log('[monitorPaymentWindow] 팝업 상태 확인 오류:', error.message);
@@ -3877,8 +3982,8 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   const quantity = get('sum-qty')?.textContent || '';
   const displayGoodname = quantity ? `${category} (${quantity})` : category;
   
-  // [Fix] returnUrl을 /payment-complete-close로 설정 - 팝업 자동 닫기
-  const returnUrl = window.location.origin + '/payment-complete-close';
+  // [Fix] returnUrl에 order_complete=true 신호 추가 - 결제 완료 후 완료창 표시
+  const returnUrl = window.location.origin + '/';
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
@@ -3904,9 +4009,7 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   }
   
   // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
-  // [Fix] 팝업 자동 종료를 위해 표준 크기 사용
-  const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=800,toolbar=no,location=no,status=no,menubar=no');
-  console.log('[startPaymentDirectOrder] PayApp 팝업 열기 완료');
+  const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
   console.log('[startPaymentDirectOrder] PayApp.setTarget 및 payrequest 호출 중...');
   PayApp.setTarget('PayAppWindow');
   PayApp.payrequest();
@@ -3914,15 +4017,6 @@ async function startPaymentDirectOrder(totalAmount, user, orderId) {
   
   // 팝업 닫힘 감지
   monitorPaymentWindow(payappWindow);
-}
-
-function showCS() {
-  navigate('view-cs', { display: 'flex' });
-  get('cs-message').value = '';
-}
-
-function hideCS() {
-  navigate('view-home');
 }
 
 function submitCS() {
@@ -3963,6 +4057,13 @@ function removeToken() {
   } catch (e) {
     console.error('토큰 삭제 실패:', e);
   }
+}
+
+function redirectToLogin() {
+  // 관리자 페이지에서 로그인 페이지로 이동
+  setTimeout(() => {
+    window.location.href = '/#view-admin-login';
+  }, 1000);
 }
 
 // 로컬/테스트 환경 여부 판단
@@ -4762,6 +4863,35 @@ async function submitOrder() {
   // 서버에서 orderId를 리턴받아 결제 팝업에서 var1으로 전달
   // 결제 완료 후 mul_no가 저장되면 주문내역에 표시됨
   try {
+    // cart 아이템에 category 필드 추가 (options.mode를 기반으로)
+    // 그리고 specs를 dict 형태로 변환 (localStorage의 기존 데이터는 string일 수 있음)
+    const itemsWithCategory = cart.map(item => {
+      const convertedItem = {
+        ...item,
+        category: item.options?.mode || item.category || 'indigo',
+        qty: typeof item.qty === 'string' ? parseInt(item.qty, 10) : (typeof item.qty === 'number' ? item.qty : 1)
+      };
+      
+      // specs가 string이면 dict으로 변환
+      if (typeof item.specs === 'string') {
+        convertedItem.specs = {
+          size: item.options?.size || 'A4',
+          inner_pages: parseInt(item.options?.innerPages || 4, 10),
+          cover_type: item.options?.coverType || '모조지',
+          cover_gram: parseInt(item.options?.coverGram || 100, 10),
+          inner_type: item.options?.innerType || '모조지',
+          inner_gram: parseInt(item.options?.innerGram || 80, 10),
+          bind_type: item.options?.binding || 'perfect',
+          cover_color: item.options?.coverPrint?.includes('컬러') ? 'color' : 'mono',
+          inner_color: item.options?.innerPrint?.includes('컬러') ? 'color' : 'mono',
+          coating: item.options?.coating || '0',
+          cover_page: 4
+        };
+      }
+      
+      return convertedItem;
+    });
+    
     const response = await fetch('/api/orders', {
       method: 'POST',
       headers: {
@@ -4769,11 +4899,11 @@ async function submitOrder() {
         'Authorization': `Bearer ${localStorage.getItem(TOKEN_KEY)}`
       },
       body: JSON.stringify({
-        items: cart,
+        items: itemsWithCategory,
         total_price: finalPrice,
         delivery_info: deliveryInfo,
         order_details: orderDetails,
-        status: 'pending' // [Fix] 미결제 상태로 생성
+        status: '주문접수' // 주문 접수 상태로 생성
       })
     });
 
@@ -4857,8 +4987,8 @@ async function startPayment(totalAmount, user, orderId) {
   const goodnames = cart.map(item => stripQtyFromName(item.name) || '인쇄 상품').join(', ');
   const displayGoodname = goodnames.length > 30 ? goodnames.substring(0, 30) + '...' : goodnames;
   
-  // [Fix] returnUrl을 /payment-complete-close로 설정 - 팝업 자동 닫기
-  const returnUrl = window.location.origin + '/payment-complete-close';
+  // [Fix] returnUrl을 홈으로 설정 (실제 완료는 monitorPaymentWindow에서 mul_no 확인으로 처리)
+  const returnUrl = window.location.origin + '/';
   
   PayApp.setParam({
     'goodname': displayGoodname || '인쇄 서비스',
@@ -4883,10 +5013,8 @@ async function startPayment(totalAmount, user, orderId) {
     console.log('[startPayment] 미결제 주문ID 저장:', orderId);
   }
   
-  // 팝업 창에서 결제 (너비 600px, 높이 800px - 팝업 자동 종료 최적화)
-  // [Fix] 팝업 자동 종료를 위해 표준 크기 사용
-  const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=800,toolbar=no,location=no,status=no,menubar=no');
-  console.log('[startPayment] PayApp 팝업 열기 완료');
+  // 팝업 창에서 결제 (너비 600px, 높이 1200px - 세로형 확대)
+  const payappWindow = window.open('', 'PayAppWindow', 'width=600,height=1200,scrollbars=yes');
   console.log('[startPayment] PayApp.setTarget 및 payrequest 호출 중...');
   PayApp.setTarget('PayAppWindow');
   PayApp.payrequest();
@@ -5172,6 +5300,7 @@ async function renderOrderHistory() {
   
   const listEl = get('order-history-list');
   const emptyEl = get('order-empty');
+  const paginationEl = get('order-history-pagination');
   
   try {
     const token = getToken();
@@ -5183,14 +5312,16 @@ async function renderOrderHistory() {
     if (!result.success) {
       listEl.innerHTML = '';
       emptyEl.style.display = 'block';
+      if (paginationEl) paginationEl.innerHTML = '';
       return;
     }
     
-    const userOrders = result.orders || [];
+    let userOrders = result.orders || [];
 
     if (userOrders.length === 0) {
       listEl.innerHTML = '';
       emptyEl.style.display = 'block';
+      if (paginationEl) paginationEl.innerHTML = '';
       return;
     }
 
@@ -5202,7 +5333,18 @@ async function renderOrderHistory() {
       return dateB - dateA;
     });
     
-    listEl.innerHTML = userOrders.map((order, i) => {
+    // 최대 20개까지만 유지
+    userOrders = userOrders.slice(0, 20);
+    
+    // 페이지네이션 설정
+    const ITEMS_PER_PAGE = 4;
+    const currentPage = parseInt(sessionStorage.getItem('orderHistoryPage') || '1');
+    const totalPages = Math.ceil(userOrders.length / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const pageOrders = userOrders.slice(startIndex, endIndex);
+    
+    listEl.innerHTML = pageOrders.map((order, i) => {
       const orderDate = order.created_at ? new Date(order.created_at).toLocaleString('ko-KR') : '-';
       
       // 수량 표기를 통일 (괄호/중복 제거 후 숫자만 추출)
@@ -5253,30 +5395,24 @@ async function renderOrderHistory() {
       const itemQty = formatQty(firstItem.qty || items.length, '권');
       
       const statusColors = {
-        '접수완료': '#10b981',
-        'pending': '#10b981',
+        '주문접수': '#10b981',
         '제작중': '#3b82f6',
-        'preparing': '#3b82f6',
         '배송중': '#f59e0b',
-        'shipping': '#f59e0b',
         '배송완료': '#6366f1',
-        'completed': '#6366f1',
         '취소': '#ef4444',
-        'cancelled': '#ef4444',
-        'refund_requested': '#f97316',
-        'refunded': '#6b7280'
+        '환불요청': '#f97316',
+        '환불완료': '#6b7280'
       };
       const statusColor = statusColors[order.status] || '#64748b';
       
       const statusText = {
-        'pending': '결제대기',
-        'completed': '주문접수',
-        'preparing': '제작중',
-        'shipping': '배송중',
-        'delivered': '배송완료',
-        'cancelled': '취소',
-        'refund_requested': '환불요청',
-        'refunded': '환불완료'
+        '주문접수': '주문접수',
+        '제작중': '제작중',
+        '배송중': '배송중',
+        '배송완료': '배송완료',
+        '취소': '취소',
+        '환불요청': '환불요청',
+        '환불완료': '환불완료'
       }[order.status] || order.status || '주문접수';
       
       return `
@@ -5308,18 +5444,57 @@ async function renderOrderHistory() {
               </div>
             ` : ''}
             
+            ${order.status === 'shipping' || order.status === '배송중' && order.tracking_number ? `
+              <div style="padding:12px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:0; margin-bottom:12px;">
+                <div style="font-size:12px; color:#047857; margin-bottom:8px; font-weight:700;">🚚 배송 정보</div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <span style="font-size:13px; color:#334155;">송장번호: <strong>${order.tracking_number}</strong></span>
+                  <button onclick="trackShipment('${order.tracking_number}')" style="padding:4px 12px; background:#0891b2; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:12px; font-weight:600;">배송조회</button>
+                </div>
+              </div>
+            ` : ''}
+            
             <div style="display:flex; gap:10px; margin-top:12px;">
-              <button onclick="viewOrderDetail('${order.order_id || i}')" style="flex:1; padding:10px; background:var(--primary); color:#fff; border:none; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">상세보기</button>
-              ${order.status === 'pending' ? `<button onclick="cancelUserOrder('${order.order_id}')" style="flex:1; padding:10px; background:#ef4444; color:#fff; border:none; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">주문취소</button>` : (order.status === 'cancelled' ? `<button onclick="deleteUserOrder('${order.order_id}')" style="flex:1; padding:10px; background:#94a3b8; color:#fff; border:none; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">삭제</button>` : `<button onclick="toast('문의 기능 준비중')" style="flex:1; padding:10px; background:#e2e8f0; color:#475569; border:none; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer;">문의하기</button>`)}
+              <button onclick="viewOrderDetail('${order.order_id || i}')" style="padding:10px 16px; background:var(--primary); color:#fff; border:none; border-radius:0; font-weight:700; font-size:13px; cursor:pointer;">상세보기</button>
+              ${order.status === '주문접수' ? `<button onclick="cancelUserOrder('${order.order_id}')" style="padding:10px 16px; background:#ef4444; color:#fff; border:none; border-radius:0; font-weight:700; font-size:13px; cursor:pointer;">주문취소</button>` : (order.status === '취소' ? `<button onclick="deleteUserOrder('${order.order_id}')" style="padding:10px 16px; background:#94a3b8; color:#fff; border:none; border-radius:0; font-weight:700; font-size:13px; cursor:pointer;">삭제</button>` : `<button onclick="toast('문의 기능 준비중')" style="padding:10px 16px; background:#e2e8f0; color:#475569; border:none; border-radius:0; font-weight:700; font-size:13px; cursor:pointer;">문의하기</button>`)}
             </div>
           </div>
         `;
     }).join('');
+    
+    // 페이지네이션 버튼 생성
+    if (paginationEl) {
+      let paginationHTML = '';
+      
+      // 이전 버튼
+      if (currentPage > 1) {
+        paginationHTML += `<button onclick="goToOrderPage(${currentPage - 1})" style="padding:8px 12px; background:#e2e8f0; color:#475569; border:none; border-radius:4px; cursor:pointer; font-weight:600; font-size:13px;">이전</button>`;
+      }
+      
+      // 페이지 번호
+      for (let i = 1; i <= totalPages; i++) {
+        const isActive = i === currentPage;
+        paginationHTML += `<button onclick="goToOrderPage(${i})" style="padding:8px 12px; background:${isActive ? 'var(--primary)' : '#e2e8f0'}; color:${isActive ? '#fff' : '#475569'}; border:none; border-radius:4px; cursor:pointer; font-weight:${isActive ? '700' : '600'}; font-size:13px;">${i}</button>`;
+      }
+      
+      // 다음 버튼
+      if (currentPage < totalPages) {
+        paginationHTML += `<button onclick="goToOrderPage(${currentPage + 1})" style="padding:8px 12px; background:#e2e8f0; color:#475569; border:none; border-radius:4px; cursor:pointer; font-weight:600; font-size:13px;">다음</button>`;
+      }
+      
+      paginationEl.innerHTML = paginationHTML;
+    }
   } catch (error) {
     console.error('주문 로드 에러:', error);
     listEl.innerHTML = '';
     emptyEl.style.display = 'block';
+    if (paginationEl) paginationEl.innerHTML = '';
   }
+}
+
+function goToOrderPage(pageNum) {
+  sessionStorage.setItem('orderHistoryPage', pageNum.toString());
+  renderOrderHistory();
 }
 
 async function cancelUserOrder(orderId) {
@@ -5402,37 +5577,6 @@ async function requestRefund(orderId) {
     const token = getToken();
     if (!token) {
       alert('로그인이 필요합니다.');
-      return;
-    }
-    
-    // [Fix] 현재 주문 상태 확인
-    const orderRes = await fetch(`/api/orders/${orderId}`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    
-    if (!orderRes.ok) {
-      alert('주문 정보를 조회할 수 없습니다.');
-      return;
-    }
-    
-    const orderData = await orderRes.json();
-    const order = orderData.order;
-    
-    // [Fix] 상태별 환불 규칙
-    if (order.status === 'completed') {
-      // 신규주문 상태: 자유로 환불 가능
-      if (!confirm('환불을 요청하시겠습니까?')) return;
-    } else if (order.status === 'preparing' || order.status === 'shipping' || order.status === 'delivered') {
-      // 제작중, 배송중, 배송완료: 관리자 승인 필요
-      alert('제작 이상 단계에서는 관리자 승인이 필요합니다.\n관리자에게 연락주세요.');
-      return;
-    } else if (order.status === 'refund_requested' || order.status === 'refunded') {
-      // 이미 환불 요청됨
-      alert('이미 환불이 요청되었거나 완료된 주문입니다.');
-      return;
-    } else {
-      alert('이 상태의 주문은 환불할 수 없습니다.');
       return;
     }
     
@@ -5530,17 +5674,25 @@ async function viewOrderDetail(orderId) {
     }
     console.log('[파이프 검증] 고객 상세 보기 - 파싱 후 orderDetails:', orderDetails);
 
+    // order_details에서 배송비와 상품금액 추출
+    let totalShipping = 0;
+    let totalProductPrice = 0;
+    if (Array.isArray(orderDetails) && orderDetails.length > 0) {
+      totalShipping = orderDetails.reduce((sum, detail) => sum + (detail.shipping || 0), 0);
+      totalProductPrice = orderDetails.reduce((sum, detail) => sum + (detail.frontend_price || detail.total || 0), 0);
+    }
+    
     order = {
       ...found,
       orderId: found.order_id || found.id,
       orderDate: found.created_at || found.date,
-      status: found.status || 'pending',
+      status: found.status || '주문접수',
       items: items,
       options: firstItem.options || found.options || {},
       specs: firstItem.specs || found.specs,
       files: firstItem.files || found.files || [],
-      price: found.total_price || firstItem.price || 0,
-      shipping: found.shipping || 0,
+      price: totalProductPrice || found.total_price || firstItem.price || 0,
+      shipping: totalShipping,
       qty: firstItem.qty || items.length || 0,
       name: firstItem.name || '주문 상품',
       orderDetails: orderDetails
@@ -5563,7 +5715,7 @@ async function viewOrderDetail(orderId) {
     'refunded': '#6b7280'
   };
   const statusLabels = {
-    '접수완료': '접수완료',
+    '주문접수': '주문접수',
     '제작중': '제작중',
     '배송중': '배송중',
     '배송완료': '배송완료',
@@ -5572,7 +5724,7 @@ async function viewOrderDetail(orderId) {
     'refunded': '환불완료'
   };
   const statusColor = statusColors[order.status] || '#64748b';
-  const statusLabel = statusLabels[order.status] || order.status || '접수완료';
+  const statusLabel = statusLabels[order.status] || order.status || '주문접수';
 
   // 옵션 정보 표시
   let optionsHtml = '';
@@ -5641,13 +5793,13 @@ async function viewOrderDetail(orderId) {
         <div style="max-width:600px; margin:0 auto;">
           <h3 style="margin:0 0 20px 0; font-weight:1100; color:#0f172a;">주문 상세</h3>
           
-          <div style="background:#fff; border:1px solid var(--line); border-radius:16px; padding:24px; margin-bottom:16px;">
+          <div style="background:#fff; border:2px solid #e2e8f0; padding:24px; margin-bottom:16px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:16px; border-bottom:2px solid #e2e8f0;">
               <div>
                 <div style="font-weight:900; font-size:18px; color:#0f172a; margin-bottom:8px;">${order.name || '상품'}</div>
                 <div style="font-size:13px; color:#64748b;">주문번호: ${order.orderId || 'N/A'}</div>
               </div>
-              <span style="padding:6px 16px; background:${statusColor}15; color:${statusColor}; border-radius:8px; font-size:13px; font-weight:700;">${statusLabel}</span>
+              <span style="padding:6px 16px; background:${statusColor}15; color:${statusColor}; font-size:13px; font-weight:700;">${statusLabel}</span>
             </div>
             
             <div style="margin-bottom:16px;">
@@ -5667,7 +5819,7 @@ async function viewOrderDetail(orderId) {
             </div>
             
             ${order.items && order.items.length > 0 ? `
-              <div style="margin-bottom:16px; padding:16px; background:#f8fafc; border-radius:8px;">
+              <div style="margin-bottom:16px; padding:16px; background:#f8fafc;">
                 <div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:12px;">📦 주문 상품 (${order.items.length}개)</div>
                 ${order.items.map((item, idx) => {
                   const itemOptions = item.options || {};
@@ -5701,20 +5853,20 @@ async function viewOrderDetail(orderId) {
                   })();
                   
                   return `
-                    <div style="background:#fff; padding:20px; border-radius:8px; margin-bottom:16px; border:1px solid #e2e8f0; box-shadow:0 1px 3px rgba(0,0,0,0.05);">
+                    <div style="background:#fff; padding:20px; margin-bottom:16px; border:2px solid #e2e8f0;">
                       <div style="font-size:16px; font-weight:700; color:#0f172a; margin-bottom:16px; padding-bottom:12px; border-bottom:2px solid #037a3f;">
                         📦 ${stripQtyFromName(item.name) || '상품'}${order.items.length > 1 ? ` (${idx + 1})` : ''}
                       </div>
                       
                       ${qtyText ? `
-                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; padding:12px; background:#f0fdf4; border-radius:6px; border-left:3px solid #037a3f;">
+                        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px; padding:12px; background:#f0fdf4;">
                           <span style="font-size:14px; color:#64748b;">수량:</span>
                           <span style="color:#037a3f; font-size:18px; font-weight:700;">${qtyText}</span>
                         </div>
                       ` : ''}
                       
                       <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; margin-bottom:16px;">
-                        <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                        <div style="background:#fafafa; padding:14px;">
                           <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📘 표지</div>
                           ${itemOptions.coverType ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">용지: <strong>${itemOptions.coverType}${itemOptions.coverGram ? ' ' + itemOptions.coverGram : ''}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">용지: 미선택</div>'}
                           ${itemOptions.coverPages ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">페이지: <strong>${itemOptions.coverPages}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">페이지: 미선택</div>'}
@@ -5741,7 +5893,7 @@ async function viewOrderDetail(orderId) {
                           })()}
                         </div>
                         
-                        <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                        <div style="background:#fafafa; padding:14px;">
                           <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📄 내지</div>
                           ${itemOptions.innerType ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">용지: <strong>${itemOptions.innerType}${itemOptions.innerGram ? ' ' + itemOptions.innerGram : ''}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">용지: 미선택</div>'}
                           ${itemOptions.innerPages ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">페이지: <strong>${itemOptions.innerPages}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">페이지: 미선택</div>'}
@@ -5749,7 +5901,7 @@ async function viewOrderDetail(orderId) {
                           ${itemOptions.innerColor ? `<div style="font-size:13px; color:#334155;">색상: <strong>${itemOptions.innerColor === 'color' ? '컬러' : '흑백'}</strong></div>` : ''}
                         </div>
                         
-                        <div style="background:#fafafa; padding:14px; border-radius:6px;">
+                        <div style="background:#fafafa; padding:14px;">
                           <div style="font-size:13px; font-weight:700; color:#037a3f; margin-bottom:10px;">📌 제본</div>
                           ${itemOptions.binding ? `<div style="font-size:13px; color:#334155; margin-bottom:4px;">방식: <strong>${itemOptions.binding === 'staple' ? '중철' : itemOptions.binding === 'perfect' ? '무선' : itemOptions.binding}</strong></div>` : '<div style="font-size:13px; color:#94a3b8;">방식: 미선택</div>'}
                           ${itemOptions.bindingDirection ? `<div style="font-size:14px; color:#037a3f; font-weight:700;">방향: ${itemOptions.bindingDirection}</div>` : '<div style="font-size:13px; color:#94a3b8;">방향: 미선택</div>'}
@@ -5788,11 +5940,11 @@ async function viewOrderDetail(orderId) {
             </div>
           </div>
           
-          ${(order.status === '접수완료' || order.status === '제작중' || order.status === 'pending' || order.status === 'preparing') && order.status !== 'refund_requested' && order.status !== 'refunded' ? `
+          ${(order.status === '주문접수' || order.status === '제작중') && order.status !== '환불요청' && order.status !== '환불완료' ? `
             <button id="request-refund-btn" class="btn" style="width:100%; margin-bottom:12px; background:#f97316; color:#fff; border:none; padding:12px; font-weight:700; cursor:pointer;">환불 요청</button>
           ` : ''}
           ${order.status === 'refund_requested' ? `
-            <div style="padding:12px; background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; margin-bottom:12px; text-align:center; color:#92400e; font-weight:600;">환불 요청이 접수되었습니다. 관리자 검토 중입니다.</div>
+            <div style="padding:12px; background:#fef3c7; margin-bottom:12px; text-align:center; color:#92400e; font-weight:600;">환불 요청이 접수되었습니다. 관리자 검토 중입니다.</div>
           ` : ''}
           <button id="close-order-detail-modal-btn" class="btn btn-primary" style="width:100%;">닫기</button>
         </div>
@@ -5802,7 +5954,7 @@ async function viewOrderDetail(orderId) {
   const modal = document.createElement('div');
   modal.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.5); display:flex; align-items:center; justify-content:center; z-index:2000; padding:20px; overflow-y:auto;';
   modal.innerHTML = `
-        <div style="background:#fff; border-radius:16px; padding:24px; max-width:700px; width:100%; max-height:90vh; overflow-y:auto;">
+        <div style="background:#fff; padding:24px; max-width:700px; width:100%; max-height:90vh; overflow-y:auto; border:2px solid #e2e8f0;">
           ${detailHtml}
         </div>
       `;
@@ -5853,7 +6005,7 @@ function toggleFullMenu() {
   const isOpen = panel.classList.contains('show');
   if (isOpen) {
     panel.classList.remove('show');
-    // 스크롤바 복원 시 레이아웃 시프트 방지
+    // 스크롤바 복현 시 레이아웃 시프트 방지
     document.body.style.paddingRight = '';
     document.body.style.overflow = '';
   } else {
@@ -5864,6 +6016,10 @@ function toggleFullMenu() {
     }
     panel.classList.add('show');
     document.body.style.overflow = 'hidden';
+    
+    // 메뉴가 열린 후 견적형 카테고리 로드 (패널 표시 이후)
+    // 이를 통해 메뉴가 먼저 보이고 콘텐츠가 로드됨
+    loadQuoteCategoriesForMenu();
   }
 }
 
@@ -6575,6 +6731,31 @@ function switchProductTab(tabName) {
 // ==========================================
 //  견적 계산기 로직
 // ==========================================
+// localStorage에서 종이 가격 DB 로드 (관리자 설정을 반영하기 위함)
+// 111.html 형식 (국전지 kook 기준)으로 변환
+function initMainYeonPriceDB() {
+  try {
+    const yeonDB = JSON.parse(localStorage.getItem('YEON_PRICE_DB') || '{}');
+    
+    // localStorage 데이터를 메인 YEON_PRICE 형식으로 변환 (국전지 기준)
+    Object.keys(yeonDB).forEach(paperType => {
+      if (!YEON_PRICE[paperType]) {
+        YEON_PRICE[paperType] = {};
+      }
+      
+      const gramPrices = yeonDB[paperType];
+      Object.keys(gramPrices).forEach(gram => {
+        const kookPrice = gramPrices[gram].kook || 0;
+        YEON_PRICE[paperType][gram] = kookPrice;
+      });
+    });
+    
+    console.log('[initMainYeonPriceDB] 종이 가격 업데이트 완료:', YEON_PRICE);
+  } catch (error) {
+    console.error('[initMainYeonPriceDB] 오류:', error);
+  }
+}
+
 const YEON_PRICE = {
   "모조지": {
     "80": 50750,
@@ -7099,110 +7280,18 @@ function calculateIndigo() {
 }
 
 // 전단지 계산
-function calculateFlyer(size, qty, margin, width, height) {
-  const inType = get('ind-innerType').value;
-  const inGram = get('ind-innerGram').value;
-  if (!YEON_PRICE[inType] || !YEON_PRICE[inType][inGram]) {
-    toast('종이 종류와 평량을 선택해주세요.');
-    return;
-  }
-  const inPrice = YEON_PRICE[inType][inGram];
-
-  // 전단지 모드에서는 인쇄 상세 드롭다운에서 단면/양면 및 색상 정보 가져오기
-  let isDouble = true; // 기본값 양면
-  let inColor = 'color'; // 기본값 컬러
-  const innerPrintSelect = get('ind-innerPrint-select');
-  if (innerPrintSelect) {
-    const printValue = innerPrintSelect.value;
-    // "2-color" 형식에서 첫 번째 숫자가 2면 양면, 1이면 단면
-    const [printType, colorType] = printValue.split('-');
-    isDouble = (printType === '2');
-    inColor = colorType || 'color';
-  } else {
-    // 드롭다운이 없으면 라디오 버튼에서 가져오기 (하위 호환)
-    inColor = getRadio('ind-innerColor') || 'color';
-    // 드롭다운이 없으면 양면으로 기본값 설정
-    isDouble = true;
-  }
-
-  let yieldSmall = 0;
-  let yieldLarge = 0;
-
-  if (size === 'A4') {
-    yieldSmall = 2;
-    yieldLarge = 8;
-  } else if (size === 'A5') {
-    yieldSmall = 4;
-    yieldLarge = 16;
-  } else if (size === 'B5') {
-    yieldSmall = 2;
-    yieldLarge = 8;
-  }
-
-  let pPaper = 0,
-    pPrint = 0,
-    pPlate = 0;
-
-  if (currentQuoteMode === 'flyer_small') {
-    const sheetsA3 = Math.ceil(qty / yieldSmall);
-    const priceA3 = inPrice / 2000;
-    pPaper = Math.round(sheetsA3 * priceA3);
-
-    const clickUnit = INDIGO_CLICK[inColor];
-    const finalClick = isDouble ? clickUnit : (clickUnit / 2);
-    pPrint = sheetsA3 * finalClick;
-  } else {
-    // [대량 전단지 옵셋] - 여분 100장 추가
-    const plateUnit = size.startsWith('B') ? 8000 : 11000;
-    const plates = (inColor === 'color' ? 4 : 1) * (isDouble ? 2 : 1);
-    pPlate = plates * plateUnit;
-
-    const sheetsFull = Math.ceil(qty / yieldLarge) + 100; // ← 여분 100장 추가
-    const yeon = sheetsFull / 500;
-    pPaper = Math.round(yeon * inPrice);
-
-    const degrees = (inColor === 'color' ? 4 : 1) * (isDouble ? 2 : 1);
-    const printYeon = Math.max(1, yeon);
-    pPrint = Math.round(printYeon * degrees * OFFSET_PRICE_PER_COLOR);
-  }
-
-  // 배송비 계산 추가
-  const ship = calculateShipping_111(qty, size, 0, 0, parseInt(inGram), true);
-  
-  const totalRaw = pPaper + pPrint + pPlate + ship.cost;
-  const totalMargin = totalRaw * (1 + margin / 100);
-  const vat = totalMargin * 0.1;
-  const final = Math.floor((totalMargin + vat) / 10) * 10;
-  const perUnit = Math.round(final / qty);
-
-  // 결과 표시
-  updateSummaryCategoryLabel();
-  get('sum-qty').textContent = qty + '장';
-  get('sum-supply').textContent = comma(Math.round(totalMargin)) + '원';
-  get('sum-vat').textContent = comma(Math.round(vat)) + '원';
-  get('sum-ship').textContent = comma(ship.cost) + '원';
-  get('sum-total').textContent = comma(final) + '원';
-}
-
-// 책자 계산
-function calculateBook(size, qty, margin, width, height) {
+async function calculateBook(size, qty, margin, width, height) {
   const innerPages = parseInt(get('ind-innerPages').value) || 0;
   const cvType = get('ind-coverType').value;
   const cvGram = get('ind-coverGram').value;
   const inType = get('ind-innerType').value;
   const inGram = get('ind-innerGram').value;
 
-  if (!YEON_PRICE[cvType] || !YEON_PRICE[cvType][cvGram]) {
-    toast('표지 종이 종류와 평량을 선택해주세요.');
-    return;
-  }
-  if (!YEON_PRICE[inType] || !YEON_PRICE[inType][inGram]) {
-    toast('내지 종이 종류와 평량을 선택해주세요.');
+  if (!cvType || !cvGram || !inType || !inGram) {
+    toast('종이 종류와 평량을 선택해주세요.');
     return;
   }
 
-  const cvPrice = YEON_PRICE[cvType][cvGram];
-  const inPrice = YEON_PRICE[inType][inGram];
   const bindType = window.currentBindType || getRadio('ind-bind') || 'perfect';
   
   // 코팅 값 가져오기
@@ -7217,112 +7306,150 @@ function calculateBook(size, qty, margin, width, height) {
   const cvColor = getRadio('ind-coverColor') || 'color';
   const inColor = getRadio('ind-innerColor') || 'color';
 
-  // 표지 페이지 (2p 또는 4p) 결정: 인쇄 상세 드롭다운에서 파싱
-  let coverPage = 4; // 기본값 4p (양면)
+  // 표지 페이지 결정
+  let coverPage = 4;
   const coverPrintSelect = get('ind-coverPrint-select');
   if (coverPrintSelect) {
-    const printValue = coverPrintSelect.value; // "2-color", "1-color" 등
+    const printValue = coverPrintSelect.value;
     const [printType] = printValue.split('-');
-    coverPage = (printType === '2') ? 4 : 2; // 2면=4p, 1면=2p
+    coverPage = (printType === '2') ? 4 : 2;
   }
 
-  let cvP = 0, cvPr = 0, cvPl = 0, cvC = 0;
-  let inP = 0, inPr = 0, inPl = 0;
-  let bind = 0;
+  // 카테고리 결정: currentQuoteMode = 'book_indigo', 'book_digital', 'book_offset'
+  const category = currentQuoteMode.replace('book_', '');
 
-  if (currentQuoteMode === 'book_offset') {
-    // [대량 책자 옵셋]
-    const pagesPerForm = (size === 'A5') ? 32 : 16;
-    const plateUnit = (size === 'B5') ? 8000 : 11000;
-    
-    // 제철 조건: 중철 + 표지/내지 종이&평량 동일
-    const isSelfCover = (bindType === 'staple' && cvType === inType && cvGram === inGram);
+  // 백엔드 호출
+  try {
+    const response = await fetch('/api/calculate-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: category,
+        qty: qty,
+        margin: margin,
+        specs: {
+          size: size,
+          inner_pages: innerPages,
+          cover_type: cvType,
+          cover_gram: parseInt(cvGram),
+          inner_type: inType,
+          inner_gram: parseInt(inGram),
+          bind_type: bindType,
+          cover_color: cvColor,
+          inner_color: inColor,
+          coating: coating,
+          cover_page: coverPage
+        }
+      })
+    });
 
-    if (isSelfCover) {
-      // [제철] 표지를 내지에 합산
-      if (coating !== 'none' && coating !== '0') cvC = (qty <= 500) ? 45000 : 80000;
-      
-      const totalPages = innerPages + coverPage; // 4p 또는 2p 추가
-      const daesu = Math.ceil((totalPages / pagesPerForm) * 2) / 2;
-      const totalSheets = (daesu * qty) + (daesu * 100); // ← 여분 100장 추가
-      const yeon = totalSheets / 500;
-      
-      const plates = Math.ceil(daesu * (inColor === 'color' ? 8 : 2));
-      inPl = plates * plateUnit;
-      inP = Math.round(yeon * inPrice);
-      inPr = Math.round(Math.max(1, yeon) * (inColor === 'color' ? 8 : 2) * OFFSET_PRICE_PER_COLOR);
-      
-    } else {
-      // [표지 별도]
-      const cvPlates = (cvColor === 'color') ? 4 : 1;
-      cvPl = cvPlates * 8000;
-      
-      const coversPerSheet = (size === 'A5') ? 4 : 2;
-      const cvSheetsFull = (qty / coversPerSheet) + 100; // ← 여분 100장
-      const cvYeon = cvSheetsFull / 500;
-      cvP = Math.round(cvYeon * (cvPrice / 2));
-      
-      // 인쇄비: 2p면 단면(1배), 4p면 양면(2배)
-      const printSideFactor = (coverPage === 4) ? 2 : 1;
-      const printDegrees = cvPlates * printSideFactor;
-      cvPr = Math.round(Math.max(1, cvYeon) * printDegrees * OFFSET_PRICE_PER_COLOR);
-      
-      if (coating !== 'none' && coating !== '0') cvC = (qty <= 500) ? 45000 : 80000;
-
-      // 내지
-      const daesu = Math.ceil((innerPages / pagesPerForm) * 2) / 2;
-      const inSheetsTotal = (daesu * qty) + (daesu * 100); // ← 여분 100장
-      const yeon = inSheetsTotal / 500;
-      
-      inPl = Math.ceil(daesu * (inColor === 'color' ? 8 : 2)) * plateUnit;
-      inP = Math.round(yeon * inPrice);
-      inPr = Math.round(Math.max(1, yeon) * (inColor === 'color' ? 8 : 2) * OFFSET_PRICE_PER_COLOR);
+    if (!response.ok) {
+      const error = await response.json();
+      toast(error.message || '계산 실패');
+      console.error('[ERROR] 계산 오류:', error);
+      return;
     }
-    bind = 50000 + (qty * 300);
-    
-  } else {
-    // [소량 책자 - 인디고/디지털]
-    const cvSheet = cvPrice / 2000;
-    cvP = Math.round(qty * cvSheet);
-    
-    const cClick = (currentQuoteMode === 'book_digital' || cvColor === 'color') ? INDIGO_CLICK.color : INDIGO_CLICK.mono;
-    // 표지 인쇄비: 2p면 절반, 4p면 전체
-    const finalClick = (coverPage === 4) ? cClick : (cClick / 2);
-    cvPr = qty * finalClick;
-    
-    if (coating !== 'none' && coating !== '0') cvC = qty * 300;
 
-    const inSheet = inPrice / 2000;
-    const factor = (size === 'A5') ? 8 : 4;
-    const sheets = Math.ceil(innerPages / factor) * qty;
-    inP = Math.round(sheets * inSheet);
+    const result = await response.json();
+    if (!result.success) {
+      toast(result.message);
+      return;
+    }
+
+    const data = result.data;
     
-    let iClick = (currentQuoteMode === 'book_digital') ? DIGITAL_CLICK : INDIGO_CLICK[inColor];
-    inPr = sheets * iClick;
-    bind = qty * (bindType === 'staple' ? 200 : 400);
+    // 결과 표시
+    const selectedBindType = window.currentBindType || getRadio('ind-bind') || 'perfect';
+    window.currentBindType = selectedBindType;
+    const sumCatEl = get('sum-cat');
+    if (sumCatEl) sumCatEl.textContent = buildSummaryCategoryLabel();
+    get('sum-qty').textContent = qty + '권';
+    get('sum-supply').textContent = comma(data.supply_cost) + '원';
+    get('sum-vat').textContent = comma(data.vat) + '원';
+    get('sum-ship').textContent = comma(data.shipping) + '원';
+    get('sum-total').textContent = comma(data.total) + '원';
+    
+    console.log('[OK] 책자 계산 완료:', data);
+  } catch (error) {
+    console.error('[ERROR] 계산 중 오류:', error);
+    toast('계산 중 오류가 발생했습니다.');
   }
-
-  // 배송비 계산 추가
-  const ship = calculateShipping_111(qty, size, innerPages, parseInt(cvGram), parseInt(inGram), false);
-  
-  const totalRaw = cvP + cvPr + cvPl + cvC + inP + inPr + inPl + bind + ship.cost;
-  const totalMargin = totalRaw * (1 + margin / 100);
-  const vat = totalMargin * 0.1;
-  const final = Math.floor((totalMargin + vat) / 10) * 10;
-  const perUnit = Math.round(final / qty);
-
-  // 결과 표시
-  const selectedBindType = window.currentBindType || getRadio('ind-bind') || 'perfect';
-  window.currentBindType = selectedBindType; // keep 글로벌 상태 최신
-  const sumCatEl = get('sum-cat');
-  if (sumCatEl) sumCatEl.textContent = buildSummaryCategoryLabel();
-  get('sum-qty').textContent = qty + '권';
-  get('sum-supply').textContent = comma(Math.round(totalMargin)) + '원';
-  get('sum-vat').textContent = comma(Math.round(vat)) + '원';
-  get('sum-ship').textContent = comma(ship.cost) + '원';
-  get('sum-total').textContent = comma(final) + '원';
 }
 
+// 전단지 계산 (백엔드 호출)
+async function calculateFlyer(size, qty, margin, width, height) {
+  const inType = get('ind-innerType').value;
+  const inGram = get('ind-innerGram').value;
+  
+  if (!inType || !inGram) {
+    toast('종이 종류와 평량을 선택해주세요.');
+    return;
+  }
+
+  // 전단지 모드에서 인쇄 상세 드롭다운에서 정보 가져오기
+  let isDouble = true;
+  let inColor = 'color';
+  const innerPrintSelect = get('ind-innerPrint-select');
+  if (innerPrintSelect) {
+    const printValue = innerPrintSelect.value;
+    const [printType, colorType] = printValue.split('-');
+    isDouble = (printType === '2');
+    inColor = colorType || 'color';
+  } else {
+    inColor = getRadio('ind-innerColor') || 'color';
+    isDouble = true;
+  }
+
+  const shipCost = 2000;
+
+  // 백엔드 호출
+  try {
+    const response = await fetch('/api/calculate-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: currentQuoteMode,  // 'flyer_small', 'flyer_large'
+        qty: qty,
+        margin: margin,
+        specs: {
+          size: size,
+          inner_type: inType,
+          inner_gram: inGram,
+          inner_color: inColor,
+          is_double: isDouble,
+          ship_cost: shipCost
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      toast(error.message || '계산 실패');
+      return;
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      toast(result.message);
+      return;
+    }
+
+    const data = result.data;
+    
+    // 결과 표시
+    updateSummaryCategoryLabel();
+    get('sum-qty').textContent = qty + '장';
+    get('sum-supply').textContent = comma(data.supply_cost) + '원';
+    get('sum-vat').textContent = comma(data.vat) + '원';
+    get('sum-ship').textContent = comma(data.shipping) + '원';
+    get('sum-total').textContent = comma(data.total) + '원';
+    
+    console.log('✅ 전단지 계산 완료:', data);
+  } catch (error) {
+    console.error('❌ 계산 오류:', error);
+    toast('계산 중 오류가 발생했습니다.');
+  }
+}
 // 전단지 라디오 버튼도 스타일 처리
 document.addEventListener('DOMContentLoaded', function() {
   // 사이즈 초기화
@@ -7357,6 +7484,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (get('ind-coverType')) {
     initIndPaper();
     initPaper_111(); // 111.html 종이 데이터 초기화
+    loadShippingCosts_111(); // 111.html 배송비 동적 로드
     // 탭이 없으므로 null 전달
     if (typeof setQuoteMode === 'function') {
       setQuoteMode('book_indigo', null);
@@ -7502,57 +7630,25 @@ function previewPopupImage() {
 async function uploadPopupImage() {
   const fileInput = get('popup-image-file');
   const file = fileInput.files[0];
-  
   if (!file) {
     toast('파일을 선택해주세요');
     return;
   }
   
-  // 파일 크기 확인 (5MB 제한)
-  if (file.size > 5 * 1024 * 1024) {
-    toast('파일 크기는 5MB 이하여야 합니다');
-    return;
-  }
-  
-  // 이미지 파일 확인
-  if (!file.type.startsWith('image/')) {
-    toast('이미지 파일만 업로드 가능합니다');
-    return;
-  }
-  
-  const formData = new FormData();
-  formData.append('file', file);
-  
   try {
-    const token = getToken();
-    const response = await fetch('/api/upload-image', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      },
-      body: formData
-    });
+    // uploadImageFile()에서 파일 검증 및 업로드 처리
+    const imagePath = await uploadImageFile(file);
     
-    if (response.ok) {
-      const result = await response.json();
-      console.log('이미지 업로드 성공:', result);
-      
-      // 경로 자동 입력
-      get('popup-image').value = result.path;
-      
-      // 미리보기 자동 표시
-      const preview = get('popup-image-preview');
-      preview.src = result.path;
-      preview.style.display = 'block';
-      
-      toast('이미지 업로드 완료');
-    } else {
-      const error = await response.json();
-      toast('업로드 실패: ' + (error.message || response.statusText));
-    }
+    // 경로 자동 입력 및 미리보기 표시
+    get('popup-image').value = imagePath;
+    const preview = get('popup-image-preview');
+    preview.src = imagePath;
+    preview.style.display = 'block';
+    
+    toast('이미지 업로드 완료');
   } catch(err) {
     console.error('Failed to upload image:', err);
-    toast('업로드 중 오류 발생');
+    toast(err.message || '업로드 중 오류 발생');
   }
 }
 
@@ -7656,8 +7752,8 @@ async function loadAndShowPopupNotice() {
       return;
     }
     
-    console.log('📡 API 호출: /api/popup-notice-list');
-    const response = await apiCall('/api/popup-notice-list', { method: 'GET' });
+    console.log('📡 API 호출: /api/popup-notice');
+    const response = await apiCall('/api/popup-notice', { method: 'GET' });
     console.log('API 응답 상태:', response.status);
     
     if (!response.ok) {
@@ -7965,7 +8061,14 @@ function initPopupDrag() {
 // ==========================================
 
 // 상수 정의
-const BOX_PRICE_111 = 4000; 
+let BOX_PRICE_111 = 4000; // 기본값 (동적으로 로드됨)
+let SHIPPING_COSTS_111 = { // 카테고리별 배송료
+    'flyer_small': 2000,
+    'flyer_large': 3000,
+    'book_digital': 3000,
+    'book_indigo': 3000,
+    'book_offset': 3000
+};
 const BOX_A4_111 = { name: "A4박스", w: 315, l: 220, h: 270, maxKg: 20 };
 const BOX_A3_111 = { name: "A3박스", w: 450, l: 305, h: 210, maxKg: 20 };
 
@@ -7991,6 +8094,41 @@ const DIGITAL_CLICK_111 = 20;
 
 let currentMode_111 = 'book_indigo';
 let quoteDetailInfo_111 = {}; // 상세 계산 정보 저장
+
+// 배송비 동적 로드 함수
+async function loadShippingCosts_111() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            console.log('[111.html] 토큰 없음 - 기본 배송비 사용');
+            return;
+        }
+        const response = await fetch('/api/admin/pricing', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error('API 호출 실패');
+        
+        const data = await response.json();
+        if (!data.success || !data.data.additional_costs) throw new Error('데이터 구조 오류');
+        
+        // 배송비 데이터 추출
+        const costs = data.data.additional_costs;
+        const shippingCosts = costs.filter(c => c.cost_name && c.cost_name.startsWith('shipping_'));
+        
+        console.log('[111.html] 배송비 로드:', shippingCosts);
+        
+        shippingCosts.forEach(sc => {
+            const key = sc.cost_name.replace('shipping_', ''); // 'shipping_flyer_small' -> 'flyer_small'
+            SHIPPING_COSTS_111[key] = parseInt(sc.cost) || 0;  // 0원도 정상값으로 취급
+        });
+        
+        // 기본값 설정 (일반적인 경우) - 0원이 설정되었으면 0원 사용
+        BOX_PRICE_111 = SHIPPING_COSTS_111['flyer_large'] !== undefined ? SHIPPING_COSTS_111['flyer_large'] : 3000;
+        console.log('[111.html] 배송비 적용 완료:', SHIPPING_COSTS_111);
+    } catch (e) {
+        console.warn('[111.html] 배송비 로드 실패 (기본값 사용):', e.message);
+    }
+}
 
 function comma_111(num) { return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 
@@ -8044,7 +8182,7 @@ function getThicknessByGram_111(gram) {
     return gram * 0.0011; 
 }
 
-function calculateShipping_111(qty, size, pages, cvGram, inGram, isFlyer) {
+function calculateShipping_111(qty, size, pages, cvGram, inGram, isFlyer, category) {
     let wMM=210, hMM=297; 
     if(size==='A5') { wMM=148; hMM=210; }
     else if(size==='B5') { wMM=182; hMM=257; }
@@ -8080,158 +8218,104 @@ function calculateShipping_111(qty, size, pages, cvGram, inGram, isFlyer) {
     const maxBooksByWeight = Math.floor((box.maxKg * 1000) / singleWeight);
     const countPerBox = Math.min(maxBooksByVol, maxBooksByWeight);
     const totalBoxes = Math.ceil(qty / countPerBox);
-    const totalShipCost = totalBoxes * BOX_PRICE_111;
+    
+    // 카테고리별 배송료 적용
+    const shippingPrice = SHIPPING_COSTS_111[category] || BOX_PRICE_111;
+    const totalShipCost = totalBoxes * shippingPrice;
 
-    return { cost: totalShipCost, boxes: totalBoxes, boxName: box.name };
+    return { cost: totalShipCost, boxes: totalBoxes, boxName: box.name, unitPrice: shippingPrice };
 }
 
-function calculateQuoteDetails_111(size, qty, innerPages, cvGram, inGram, cvType, inType, cvDetail, inDetail, bindType, coating, currentMode, margin) {
-    // 상세 계산 정보 객체 반환
-    const inPrice = getPaperPrice_111(inType, inGram, size);
-    const cvPrice = getPaperPrice_111(cvType, cvGram, size);
-    
-    const cvColor = cvDetail.includes('color') ? 'color' : 'mono';
-    const cvSide = cvDetail.includes('double') ? 'double' : 'single';
-    const inSide = inDetail.includes('double') ? 'double' : 'single';
-    const inColorVal = inDetail.includes('color') ? 'color' : 'mono';
-    
-    let details = {
-        mode: currentMode,
-        size: size,
-        qty: qty,
-        paperTypes: {
-            cover: { type: cvType, gram: cvGram, side: cvSide, color: cvColor },
-            inner: { type: inType, gram: inGram, side: inSide, color: inColorVal }
-        },
-        bindType: bindType,
-        coating: coating,
-        margin: margin
-    };
 
-    if (currentMode === 'book_offset') {
-        const plateUnit = 11000;
-        let cvC = 0;
-        
-        if(coating!=='none') {
-            if(qty <= 500) cvC = 45000;
-            else if(qty <= 1000) cvC = 80000;
-            else if(qty <= 1500) cvC = 120000;
-            else if(qty <= 2000) cvC = 155000;
-            else cvC = 155000 + (Math.ceil((qty-2000)/500) * 35000); 
-        }
-
-        let itemsPerSheet = (size === 'A5') ? 4 : 2; 
-        let netSheets2Jeol = Math.ceil(qty / itemsPerSheet); 
-        let totalSheets2Jeol = netSheets2Jeol + 130; 
-        
-        let cvYeon = totalSheets2Jeol / 1000; 
-        let cvP = Math.round(cvYeon * cvPrice);
-        const cvPlateCount = (cvSide==='double') ? 8 : 4; 
-        let cvPl = cvPlateCount * 8000; 
-        const printDegrees = (cvSide==='double') ? 8 : 4; 
-        const cvPrintYeon = Math.max(1, cvYeon);
-        let cvPr = Math.round(cvPrintYeon * printDegrees * OFFSET_PRICE_PER_COLOR_111);
-
-        let pagesPerForm = (size === 'A5') ? 32 : 16; 
-        const daesu = Math.ceil((innerPages/pagesPerForm)*2)/2;
-        
-        const inSheetsTotal = (daesu * qty) + (daesu * 130);
-        const yeon = inSheetsTotal / 500;
-        
-        const plateCountPerDaesu = (inColorVal==='color'?4:1) * (inSide==='double'?2:1);
-        let inPl = Math.ceil(daesu * plateCountPerDaesu) * plateUnit;
-        let inP = Math.round(yeon * inPrice);
-        let inPr = Math.round(Math.max(1, yeon) * plateCountPerDaesu * OFFSET_PRICE_PER_COLOR_111);
-
-        let bind = 0;
-        let bindMsg = "";
-        if (bindType === 'perfect') {
-            const div = (size === 'A4') ? 4000 : 8000;
-            const bindR = Math.ceil((innerPages / 2 * qty) / div);
-            if (bindR <= 6) bind = 120000;
-            else bind = 120000 + ((bindR - 6) * 20000);
-            bindMsg = `제본연수: ${bindR}연`;
-        } else {
-            bind = 50000 + (qty * 300);
-        }
-
-        const ship = calculateShipping_111(qty, size, innerPages, cvGram, inGram, false);
-
-        details.cover = { paper: cvP, print: cvPr, plate: cvPl, coat: cvC, total: cvP+cvPr+cvPl+cvC };
-        details.inner = { paper: inP, print: inPr, plate: inPl, total: inP+inPr+inPl, daesu: daesu };
-        details.bind = { cost: bind, msg: bindMsg };
-        details.shipping = { cost: ship.cost, boxes: ship.boxes, boxName: ship.boxName };
-        details.totalRaw = cvP+cvPr+cvPl+cvC + inP+inPr+inPl + bind + ship.cost;
-    } else {
-        // 인디고/디지털
-        const cvSheet = cvPrice/2000; 
-        let cvP = Math.round(qty*cvSheet);
-        const cClick = (currentMode==='book_digital'||cvColor==='color')?INDIGO_CLICK_111.color : INDIGO_CLICK_111.mono;
-        const finalClick = (cvSide === 'double') ? cClick : (cClick/2); 
-        let cvPr = qty * finalClick;
-        let cvC = 0;
-        if(coating!=='none') cvC = qty*300;
-
-        const inSheet = inPrice/2000;
-        let factor = (size==='A5')?8:4; 
-        if(inSide === 'single') factor = factor / 2; 
-        const sheets = Math.ceil(innerPages/factor)*qty;
-        let inP = Math.round(sheets*inSheet);
-        let iClick = (currentMode==='book_digital')?DIGITAL_CLICK_111 : INDIGO_CLICK_111[inColorVal];
-        if(inSide === 'single') iClick = iClick / 2; 
-        let inPr = sheets * iClick;
-        let bind = qty*(bindType==='staple'?200:400);
-        let inMsg = `소요장수: ${sheets}장`;
-
-        const ship = calculateShipping_111(qty, size, innerPages, cvGram, inGram, false);
-
-        details.cover = { paper: cvP, print: cvPr, plate: 0, coat: cvC, total: cvP+cvPr+cvC };
-        details.inner = { paper: inP, print: inPr, plate: 0, total: inP+inPr, sheets: sheets, msg: inMsg };
-        details.bind = { cost: bind };
-        details.shipping = { cost: ship.cost, boxes: ship.boxes, boxName: ship.boxName };
-        details.totalRaw = cvP+cvPr+cvC + inP+inPr + bind + ship.cost;
-    }
-
-    return details;
-}
-
-// 견적 계산 및 상세정보 저장 함수
-function calculateAndSaveQuoteDetails_111(specs) {
+// 견적 계산 (백엔드에서 수행 후 결과 저장)
+async function calculateAndSaveQuoteDetails_111(specs) {
     const size = specs.size || 'A4';
     const qty = parseInt(specs.qty) || 0;
-    const margin = parseInt(specs.margin) || 0;
     const innerPages = parseInt(specs.innerPages) || 16;
     const bindType = specs.bindType || 'staple';
-    const currentMode = specs.mode || 'book_indigo';
-    const coating = specs.coating || 'none';
+    const category = specs.mode || 'book_indigo';
+    const coating = specs.coating || '0';
     const cvType = specs.coverType || '모조지';
     const cvGram = parseInt(specs.coverGram) || 200;
     const cvDetail = specs.coverDetail || 'mono_double';
     const inType = specs.innerType || '모조지';
     const inGram = parseInt(specs.innerGram) || 80;
     const inDetail = specs.innerDetail || 'mono_double';
+    const margin = parseInt(specs.margin) || 0;
 
-    // 상세 계산 정보 생성
-    const details = calculateQuoteDetails_111(size, qty, innerPages, cvGram, inGram, cvType, inType, cvDetail, inDetail, bindType, coating, currentMode, margin);
-    
-    // 상세 정보 저장
-    quoteDetailInfo_111 = details;
-    
-    // 최종 가격 계산
-    const totalMargin = details.totalRaw * (1 + margin/100);
-    const marginAmt = totalMargin - details.totalRaw;
-    const vat = totalMargin * 0.1;
-    const final = Math.floor((totalMargin+vat)/10)*10;
-    const perUnit = Math.round(final/qty);
+    // 백엔드 스펙 구성
+    const backendSpecs = {
+        size: size,
+        inner_pages: innerPages,
+        cover_type: cvType,
+        cover_gram: cvGram,
+        inner_type: inType,
+        inner_gram: inGram,
+        bind_type: bindType,
+        cover_color: cvDetail.includes('color') ? 'color' : 'mono',
+        inner_color: inDetail.includes('color') ? 'color' : 'mono',
+        cover_page: cvDetail.includes('double') ? 4 : 2,
+        coating: coating,
+        is_double: cvDetail.includes('double') ? true : false
+    };
 
-    details.finalPrice = final;
-    details.perUnitPrice = perUnit;
-    details.supplyPrice = Math.round(totalMargin);
-    details.vat = Math.round(vat);
-    details.marginPercent = margin;
-    details.marginAmount = Math.round(marginAmt);
+    try {
+        // 백엔드에 계산 요청
+        const response = await fetch('/api/calculate-quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                category: category,
+                qty: qty,
+                margin: margin,
+                specs: backendSpecs,
+                member_type: 'general'
+            })
+        });
 
-    return details;
+        if (!response.ok) throw new Error('계산 실패');
+
+        const result = await response.json();
+        if (!result.success) throw new Error(result.message || '계산 실패');
+
+        const data = result.data;
+        
+        // 상세 정보 저장 (백엔드 결과 기반)
+        quoteDetailInfo_111 = {
+            mode: category,
+            size: size,
+            qty: qty,
+            category: category,
+            breakdown: data.breakdown || {},
+            cover: data.breakdown?.cover ? {
+                paper: data.breakdown.cover.paper,
+                print: data.breakdown.cover.print,
+                plate: data.breakdown.cover.plate || 0,
+                coat: data.breakdown.cover.coat || 0,
+                total: (data.breakdown.cover.paper || 0) + (data.breakdown.cover.print || 0) + (data.breakdown.cover.plate || 0) + (data.breakdown.cover.coat || 0)
+            } : { paper: 0, print: 0, plate: 0, coat: 0, total: 0 },
+            inner: data.breakdown?.inner ? {
+                paper: data.breakdown.inner.paper,
+                print: data.breakdown.inner.print,
+                plate: data.breakdown.inner.plate || 0,
+                total: (data.breakdown.inner.paper || 0) + (data.breakdown.inner.print || 0) + (data.breakdown.inner.plate || 0)
+            } : { paper: 0, print: 0, plate: 0, total: 0 },
+            bind: { cost: data.breakdown?.binding || 0 },
+            shipping: { cost: data.shipping || 0 },
+            totalRaw: (data.supply_cost || 0) - Math.floor((data.supply_cost || 0) * 0.1),
+            finalPrice: data.total,
+            supplyPrice: data.supply_cost,
+            vat: data.vat,
+            marginPercent: margin,
+            perUnitPrice: Math.round(data.total / qty)
+        };
+
+        return quoteDetailInfo_111;
+    } catch (error) {
+        console.error('❌ 견적 계산 실패:', error);
+        alert('견적 계산에 실패했습니다: ' + error.message);
+        return null;
+    }
 }
 
 function setBestThumbnails() {
@@ -8274,4 +8358,1029 @@ function setBestThumbnails() {
     imgEl.alt = title;
     btn.setAttribute('aria-label', `${title} 견적 이동`);
   });
+}
+
+// 테이블 열 너비 조절 초기화
+document.addEventListener('DOMContentLoaded', () => {
+  // 지연 로딩 초기화
+  initLazyLoading();
+  
+  const tables = ['order-list-table'];
+  tables.forEach(tableId => {
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    
+    const resizers = table.querySelectorAll('.col-resizer');
+    resizers.forEach(resizer => {
+      resizer.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const th = resizer.parentElement;
+        const startX = e.pageX;
+        const startWidth = th.offsetWidth;
+
+        const onMouseMove = (e) => {
+          const diff = e.pageX - startX;
+          const newWidth = Math.max(30, startWidth + diff);
+          th.style.width = newWidth + 'px';
+          th.style.minWidth = newWidth + 'px';
+        };
+
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+        };
+
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+      });
+    });
+  });
+});
+
+// 접수주문 리스트 체크박스 전체 선택/해제
+function toggleAllOrderListChecks(checkbox) {
+  const tbody = document.getElementById('order-list-body');
+  if (!tbody) return;
+  
+  const checkboxes = tbody.querySelectorAll('input[type="checkbox"]');
+  checkboxes.forEach(cb => {
+    cb.checked = checkbox.checked;
+  });
+}
+
+// 선택된 주문의 체크된 항목들 가져오기
+function getCheckedOrderIds() {
+  const tbody = document.getElementById('order-list-body');
+  if (!tbody) return [];
+  
+  const checkboxes = tbody.querySelectorAll('input[type="checkbox"]:checked');
+  const orderIds = [];
+  checkboxes.forEach(cb => {
+    const orderId = cb.dataset.orderId || cb.getAttribute('data-order-id');
+    if (orderId) orderIds.push(orderId);
+  });
+  return orderIds;
+}
+
+// 일괄 상태 변경
+async function bulkUpdateOrderStatus(newStatus) {
+  const orderIds = getCheckedOrderIds();
+  if (orderIds.length === 0) {
+    toast('변경할 주문을 선택해주세요.');
+    return;
+  }
+  
+  const token = getToken();
+  if (!token) {
+    toast('❌ 유효한 토큰이 없습니다. 다시 로그인해주세요.');
+    redirectToLogin();
+    return;
+  }
+  
+  const statusMap = {
+    'preparing': '제작중',
+    'shipping': '배송중',
+    'completed': '배송완료'
+  };
+  
+  const koreanStatus = statusMap[newStatus] || newStatus;
+  const statusText = {
+    '제작중': '제작',
+    '배송중': '배송',
+    '배송완료': '배송완료',
+    '취소': '취소'
+  }[koreanStatus] || koreanStatus;
+  
+  if (!confirm(`선택된 ${orderIds.length}개 주문을 "${statusText}" 상태로 변경하시겠습니까?`)) return;
+  
+  try {
+    const response = await fetch('/api/admin/orders/bulk-update-status', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        order_ids: orderIds,
+        status: koreanStatus
+      })
+    });
+    
+    // 401 토큰 오류 처리
+    if (response.status === 401) {
+      toast('❌ 세션이 만료되었습니다. 다시 로그인해주세요.');
+      removeToken();
+      redirectToLogin();
+      return;
+    }
+    
+    const result = await response.json();
+    if (result.success) {
+      toast(`${statusText} 상태로 변경되었습니다.`);
+      // 모든 주문 다시 조회하여 통계 업데이트
+      const allOrdersResponse = await fetch('/api/admin/orders', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const allOrdersResult = await allOrdersResponse.json();
+      if (allOrdersResult.success && allOrdersResult.orders) {
+        updateAdminOrderStats(allOrdersResult.orders);
+        // 현재 필터 상태로 다시 조회하여 테이블 업데이트
+        const statusToFilter = currentAdminFilterStatus === 'all' ? '' : currentAdminFilterStatus;
+        const queryParam = statusToFilter ? `?status=${encodeURIComponent(statusToFilter)}` : '';
+        const ordersResponse = await fetch(`/api/admin/orders${queryParam}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const ordersResult = await ordersResponse.json();
+        if (ordersResult.success && ordersResult.orders) {
+          renderAdminOrderTable(ordersResult.orders);
+        }
+      }
+      // 체크박스 초기화
+      document.getElementById('order-list-check-all').checked = false;
+    } else {
+      toast(result.message || '변경에 실패했습니다.');
+    }
+  } catch (error) {
+    console.error('상태 변경 오류:', error);
+    toast('오류가 발생했습니다.');
+  }
+}
+
+// 일괄 삭제
+async function bulkDeleteOrders() {
+  const orderIds = getCheckedOrderIds();
+  if (orderIds.length === 0) {
+    toast('삭제할 주문을 선택해주세요.');
+    return;
+  }
+  
+  const token = getToken();
+  if (!token) {
+    toast('❌ 유효한 토큰이 없습니다. 다시 로그인해주세요.');
+    redirectToLogin();
+    return;
+  }
+  
+  if (!confirm(`선택된 ${orderIds.length}개 주문을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+  
+  try {
+    const response = await fetch('/api/admin/orders/bulk-delete', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        order_ids: orderIds
+      })
+    });
+    
+    // 401 토큰 오류 처리
+    if (response.status === 401) {
+      toast('❌ 세션이 만료되었습니다. 다시 로그인해주세요.');
+      removeToken();
+      redirectToLogin();
+      return;
+    }
+    
+    const result = await response.json();
+    if (result.success) {
+      toast('주문이 삭제되었습니다.');
+      // 모든 주문 다시 조회하여 통계 업데이트
+      const allOrdersResponse = await fetch('/api/admin/orders', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const allOrdersResult = await allOrdersResponse.json();
+      if (allOrdersResult.success && allOrdersResult.orders) {
+        updateAdminOrderStats(allOrdersResult.orders);
+        renderAdminOrderTable(allOrdersResult.orders);
+      } else {
+        renderAdminOrderTable([]);
+        updateAdminOrderStats([]);
+      }
+      // 체크박스 초기화
+      document.getElementById('order-list-check-all').checked = false;
+    } else {
+      toast(result.message || '삭제에 실패했습니다.');
+    }
+  } catch (error) {
+    console.error('삭제 오류:', error);
+    toast('오류가 발생했습니다.');
+  }
+}
+
+// 배송 송장번호 저장
+async function updateShippingNumber(orderId) {
+  const shippingInput = document.getElementById('shipping-number-input');
+  if (!shippingInput) return;
+  
+  const shippingNumber = shippingInput.value.trim();
+  if (!shippingNumber) {
+    toast('송장번호를 입력해주세요.');
+    return;
+  }
+  
+  try {
+    const token = getToken();
+    const response = await fetch(`/api/admin/orders/${orderId}/shipping`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ shipping_number: shippingNumber })
+    });
+    
+    const result = await response.json();
+    if (result.success) {
+      toast('송장번호가 저장되었습니다.');
+      // 모달 업데이트
+      const shippingDisplay = shippingInput.parentElement.nextElementSibling;
+      if (shippingDisplay) {
+        shippingDisplay.style.display = 'flex';
+        shippingDisplay.innerHTML = `
+          <span style="font-size:13px; color:#334155;">송장번호: <strong>${shippingNumber}</strong></span>
+          <button onclick="trackShipment('${shippingNumber}')" style="padding:4px 12px; background:#0891b2; color:#fff; border:none; border-radius:0; cursor:pointer; font-size:12px; font-weight:600;">배송조회</button>
+        `;
+      }
+    } else {
+      toast(result.message || '저장에 실패했습니다.');
+    }
+  } catch (error) {
+    console.error('배송 송장 저장 에러:', error);
+    toast('오류가 발생했습니다.');
+  }
+}
+
+// 배송 조회
+function trackShipment(shippingNumber) {
+  if (!shippingNumber) {
+    toast('송장번호가 없습니다.');
+    return;
+  }
+  
+  // 택배사 추적 사이트로 이동 (우체국, CJ대한통운 등)
+  const trackUrl = `https://www.cjgls.com/tool/trackingView?slipno=${shippingNumber}`;
+  window.open(trackUrl, '_blank');
+}
+
+// 배송 정보 엑셀 다운로드
+async function downloadShippingExcel() {
+  try {
+    const token = getToken();
+    const response = await fetch('/api/admin/orders?status=%EB%B0%B0%EC%86%A1%EC%A4%91', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    const result = await response.json();
+    if (!result.success || !result.orders) {
+      toast('배송중인 주문이 없습니다.');
+      return;
+    }
+    
+    const orders = result.orders;
+    if (orders.length === 0) {
+      toast('배송중인 주문이 없습니다.');
+      return;
+    }
+    
+    // 클라이언트에서 CSV 생성
+    createShippingExcel(orders);
+  } catch (error) {
+    console.error('엑셀 다운로드 에러:', error);
+    toast('다운로드 중 오류가 발생했습니다.');
+  }
+}
+
+// 클라이언트에서 엑셀 생성 (SheetJS 없이 CSV로 생성)
+function createShippingExcel(orders) {
+  const rows = [
+    ['주문번호', '고객명', '배송지', '전화번호', '송장번호']
+  ];
+  
+  orders.forEach(order => {
+    const deliveryInfo = order.delivery_info || {};
+    rows.push([
+      order.order_id || '',
+      order.customer_name || order.user_name || order.name || '-',
+      order.shipping_address || order.user_address || order.address || '-',
+      deliveryInfo.phone || '-',
+      order.tracking_number || ''
+    ]);
+  });
+  
+  // CSV 생성
+  const csv = rows.map(row => 
+    row.map(cell => `"${String(cell).replace(/"/g, '""')}"` ).join(',')
+  ).join('\n');
+  
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `배송정보_${new Date().toISOString().split('T')[0]}.csv`;
+  link.click();
+  
+  toast('엑셀 다운로드가 완료되었습니다.');
+}
+
+// 주문 내역서 JPG 다운로드
+async function downloadOrderInvoices() {
+  // 체크된 주문 가져오기
+  const checkboxes = document.querySelectorAll('#order-list-body input[type="checkbox"]:checked');
+  if (checkboxes.length === 0) {
+    toast('주문을 선택해주세요.');
+    return;
+  }
+  
+  const order_ids = Array.from(checkboxes).map(cb => {
+    const row = cb.closest('tr');
+    return row ? row.cells[1]?.textContent?.trim() : null;
+  }).filter(id => id);
+  
+  if (order_ids.length === 0) {
+    toast('유효한 주문이 없습니다.');
+    return;
+  }
+  
+  console.log('📋 내역서 다운로드 시작:', order_ids);
+  toast('내역서를 생성 중입니다...');
+  
+  try {
+    const token = getToken();
+    const response = await fetch('/api/admin/orders/invoice/download', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ order_ids })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      toast('오류: ' + (error.message || '내역서 생성 실패'));
+      return;
+    }
+    
+    // 파일 다운로드
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // 파일명 결정 (ZIP인지 JPG인지)
+    if (order_ids.length === 1) {
+      a.download = `주문내역서_${order_ids[0]}.jpg`;
+    } else {
+      const now = new Date();
+      const dateStr = now.getFullYear() + 
+        String(now.getMonth() + 1).padStart(2, '0') + 
+        String(now.getDate()).padStart(2, '0') + '_' +
+        String(now.getHours()).padStart(2, '0') +
+        String(now.getMinutes()).padStart(2, '0') +
+        String(now.getSeconds()).padStart(2, '0');
+      a.download = `주문내역서_${dateStr}.zip`;
+    }
+    
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    toast(`✅ ${order_ids.length}개 내역서가 다운로드되었습니다.`);
+  } catch (error) {
+    console.error('내역서 다운로드 오류:', error);
+    toast('내역서 다운로드 중 오류가 발생했습니다.');
+  }
+}
+
+// 배송 정보 엑셀 업로드
+async function handleShippingExcelUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  try {
+    const text = await file.text();
+    const lines = text.split('\n').filter(line => line.trim());
+    
+    if (lines.length < 2) {
+      toast('유효한 파일이 아닙니다. 최소 2줄 이상 필요합니다.');
+      return;
+    }
+    
+    // CSV 파싱 (간단한 버전)
+    const updates = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cells = lines[i].split(',').map(c => c.replace(/"/g, '').trim());
+      if (cells.length >= 2 && cells[0] && cells[4]) {
+        updates.push({
+          order_id: cells[0],
+          shipping_number: cells[4]
+        });
+      }
+    }
+    
+    if (updates.length === 0) {
+      toast('업로드할 송장정보가 없습니다.');
+      return;
+    }
+    
+    // 배송정보 일괄 저장
+    const token = getToken();
+    const response = await fetch('/api/admin/orders/shipping/bulk-update', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ updates })
+    });
+    
+    const result = await response.json();
+    if (result.success) {
+      toast(`${result.count}개의 송장정보가 저장되었습니다.`);
+      // 리스트 새로고침
+      filterAdminOrderByStatus('배송중');
+      // 파일 입력 초기화
+      event.target.value = '';
+    } else {
+      toast(result.message || '저장에 실패했습니다.');
+    }
+  } catch (error) {
+    console.error('엑셀 업로드 에러:', error);
+    toast('파일 처리 중 오류가 발생했습니다.');
+  }
+}
+
+// ===== 비용 관리 (가격 관리) =====
+// 주의: loadPricingSettings() 및 savePricingSettings()는 pricing-functions.js에서 제공됩니다
+// 더 이상 이 파일에서는 정의되지 않습니다. pricing-functions.js를 참조하세요.
+
+// === 종이/인쇄비 관리 ===
+const YEON_PRICE_DB_DEFAULT = {
+  "모조지": { "80": { "4x6": 73060, "kook": 50750 }, "100": { "4x6": 90530, "kook": 62920 }, "120": { "4x6": 108620, "kook": 75460 }, "150": { "4x6": 135780, "kook": 94320 } },
+  "미색모조지": { "80": { "4x6": 75250, "kook": 52270 }, "100": { "4x6": 93280, "kook": 64790 } },
+  "플러스지백색": { "80": { "4x6": 75250, "kook": 57270 }, "100": { "4x6": 93240, "kook": 64790 } },
+  "플러스지미색": { "80": { "4x6": 77510, "kook": 53840 }, "100": { "4x6": 96030, "kook": 66700 } },
+  "하이플러스연미": { "90": { "4x6": 88550, "kook": 61500 } },
+  "아트지": { "100": { "4x6": 90040, "kook": 62590 }, "120": { "4x6": 108030, "kook": 75040 }, "150": { "4x6": 137400, "kook": 95480 }, "180": { "4x6": 164890, "kook": 114540 }, "200": { "4x6": 183190, "kook": 127270 }, "250": { "4x6": 228980, "kook": 159070 } },
+  "스노우지": { "100": { "4x6": 90040, "kook": 62590 }, "120": { "4x6": 108030, "kook": 75040 }, "150": { "4x6": 137400, "kook": 95480 }, "180": { "4x6": 164890, "kook": 114540 }, "200": { "4x6": 183190, "kook": 127270 }, "250": { "4x6": 228980, "kook": 159070 } }
+};
+
+const PRINT_COSTS_DEFAULT = {
+  cover_print: 5000,
+  inner_print: 3000,
+  cover_plate: 50000,
+  inner_plate: 30000,
+  margin: 100
+};
+
+function initPaperPriceDB() {
+  // localStorage에서 종이 가격 DB 로드 (없으면 기본값 사용)
+  const stored = localStorage.getItem('YEON_PRICE_DB');
+  if (!stored) {
+    localStorage.setItem('YEON_PRICE_DB', JSON.stringify(YEON_PRICE_DB_DEFAULT));
+  }
+  
+  // 종이 종류 드롭다운 초기화
+  const select = get('paper-type-select');
+  const paperNames = Object.keys(YEON_PRICE_DB_DEFAULT);
+  select.innerHTML = '<option value="">-- 종이 선택 --</option>';
+  paperNames.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+}
+
+function loadPaperPrices() {
+  const paperType = get('paper-type-select').value;
+  if (!paperType) return;
+  
+  const yeonDB = JSON.parse(localStorage.getItem('YEON_PRICE_DB') || JSON.stringify(YEON_PRICE_DB_DEFAULT));
+  const printCosts = JSON.parse(localStorage.getItem('PRINT_COSTS') || JSON.stringify(PRINT_COSTS_DEFAULT));
+  
+  // 선택한 종이의 그램수별 가격 표시
+  const container = get('paper-prices-container');
+  container.innerHTML = '';
+  
+  const gramPrices = yeonDB[paperType] || {};
+  Object.keys(gramPrices).forEach(gram => {
+    const prices = gramPrices[gram];
+    const html = `
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:12px;">
+        <div style="font-weight:700; font-size:12px; margin-bottom:10px; color:#0f172a;">${gram}g</div>
+        <div style="margin-bottom:8px;">
+          <label style="display:block; font-weight:600; font-size:11px; margin-bottom:4px; color:#475569;">국전지 (kook)</label>
+          <input type="number" value="${prices.kook}" min="0" oninput="if (this.value < 0) this.value = 0;" onchange="updatePaperPrice('${paperType}', '${gram}', 'kook', this.value)" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:0; font-size:11px; box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="display:block; font-weight:600; font-size:11px; margin-bottom:4px; color:#475569;">46전지 (4x6)</label>
+          <input type="number" value="${prices['4x6']}" min="0" oninput="if (this.value < 0) this.value = 0;" onchange="updatePaperPrice('${paperType}', '${gram}', '4x6', this.value)" style="width:100%; padding:6px 8px; border:1px solid #cbd5e1; border-radius:0; font-size:11px; box-sizing:border-box;">
+        </div>
+      </div>
+    `;
+    container.innerHTML += html;
+  });
+  
+  // 인쇄비/판비 로드
+  get('cover-print-cost').value = printCosts.cover_print || 5000;
+  get('inner-print-cost').value = printCosts.inner_print || 3000;
+  get('cover-plate-cost').value = printCosts.cover_plate || 50000;
+  get('inner-plate-cost').value = printCosts.inner_plate || 30000;
+  get('paper-margin-rate').value = printCosts.margin || 100;
+}
+
+// ===== 페이지 초기화 =====
+(async () => {
+  try {
+    // 페이지 로드 시 contentDB 초기화
+    const response = await fetch('/api/category-costs');
+    const result = await response.json();
+    if (result.success) {
+      Object.assign(contentDB, result.data);
+      console.log('[INIT] contentDB 로드 완료');
+    }
+  } catch (e) {
+    console.warn('[INIT] contentDB 로드 실패 (계속 진행):', e);
+  }
+})();
+
+// ===== 홈페이지 판매형 카테고리 로드 =====
+async function loadSellableCategoriesForHome() {
+  try {
+    const timestamp = new Date().getTime();
+    const response = await fetch(`/api/categories?type=sellable&parent_only=true&_t=${timestamp}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    
+    // 응답 상태 확인
+    if (!response.ok) {
+      console.error(`[Home Categories] HTTP ${response.status}: ${response.statusText}`);
+      const grid = document.getElementById('home-category-grid');
+      if (grid) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #94a3b8;">서버 오류</div>';
+      }
+      return;
+    }
+    
+    const result = await response.json();
+    
+    if (!result.success || !result.data || result.data.length === 0) {
+      console.log('[Home Categories] 판매형 카테고리 없음');
+      const grid = document.getElementById('home-category-grid');
+      if (grid) {
+        grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #94a3b8;">준비 중입니다.</div>';
+      }
+      return;
+    }
+    
+    const categories = result.data;
+    console.log('[Home Categories] API 반환:', categories.length, '개 부모 카테고리');
+    categories.forEach((cat, idx) => {
+      console.log(`  ${idx+1}. ${cat.name} (ID:${cat.id}) - Children: ${cat.children ? cat.children.length : 0}`);
+    });
+    
+    const container = document.getElementById('home-category-grid');
+    
+    if (!container) {
+      console.error('[Home Categories] home-category-grid 엘리먼트를 찾을 수 없음!');
+      return;
+    }
+    
+    // 세로 배열로 변경
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    container.style.gap = '24px';
+    container.style.gridTemplateColumns = 'unset';
+    
+    // 각 카테고리별로 상품 조회
+    Promise.all(categories.map(async (cat) => {
+      try {
+        const prodResponse = await fetch(`/api/products?category_id=${cat.id}&type=sellable&_t=${new Date().getTime()}`, {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
+        const prodData = prodResponse.json();
+        return { category: cat, products: prodData.data || [] };
+      } catch (e) {
+        console.warn(`상품 로드 실패 (${cat.name}):`, e);
+        return { category: cat, products: [] };
+      }
+    })).then(catProducts => {
+      // 상품이 있는 카테고리만 필터링
+      const validCats = catProducts.filter(cp => cp.products && cp.products.length > 0);
+      
+      if (validCats.length === 0) {
+        container.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #94a3b8;">상품이 준비 중입니다.</div>';
+        return;
+      }
+      
+      container.innerHTML = validCats.map(({ category: cat, products }) => {
+        const productGrid = products.slice(0, 4).map(prod => `
+          <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background: #fff; cursor: pointer; transition: all 0.2s;" 
+               onclick="goCategory(${cat.id})"
+               onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.08)'; this.style.transform='translateY(-2px)'"
+               onmouseout="this.style.boxShadow='none'; this.style.transform='translateY(0)'">
+            <!-- 상품 이미지 -->
+            <div style="width: 100%; height: 200px; background: #f1f5f9; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+              ${prod.image_url 
+                ? `<img src="${prod.image_url}" alt="${prod.name}" style="width: 100%; height: 100%; object-fit: cover;">` 
+                : `<div style="font-size: 40px;">${cat.icon || '🎁'}</div>`
+              }
+            </div>
+            <!-- 상품 정보 -->
+            <div style="padding: 10px; text-align: center;">
+              <div style="font-size: 12px; font-weight: 600; color: #0f172a; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                ${prod.name || cat.name}
+              </div>
+              <div style="font-size: 13px; font-weight: 700; color: #037a3f;">
+                ${prod.base_price ? (prod.base_price).toLocaleString() + '원' : '문의'}
+              </div>
+            </div>
+          </div>
+        `).join('');
+        
+        return `
+          <div>
+            <!-- 카테고리 제목 -->
+            <div style="margin-bottom: 12px; border-bottom: 2px solid #037a3f; padding-bottom: 8px;">
+              <div style="font-weight: 800; font-size: 16px; color: #0f172a;">
+                ${cat.icon || '🎁'} ${cat.name}
+              </div>
+              <div style="font-size: 12px; color: #64748b; margin-top: 2px;">
+                ${cat.description || ''}
+              </div>
+            </div>
+            
+            <!-- 상품 그리드 (4개씩) -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;">
+              ${productGrid}
+            </div>
+          </div>
+        `;
+      }).join('');
+    });
+    
+    console.log(`[Home Categories] 카테고리별 상품 로드 시작`);
+  } catch (error) {
+    console.error('[Home Categories] 오류:', error);
+    const grid = document.getElementById('home-category-grid');
+    if (grid) {
+      grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 30px; color: #94a3b8;">오류가 발생했습니다.</div>';
+    }
+  }
+}
+
+// ===== 전체메뉴용 판매형 카테고리 로드 =====
+async function loadQuoteCategoriesForMenu() {
+  try {
+    console.log('[Menu Categories] 견적형 카테고리 로드 시작...');
+    const timestamp = new Date().getTime();
+    const response = await fetch(`/api/categories?_t=${timestamp}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    
+    if (!response.ok) {
+      console.error(`[Menu Categories] HTTP ${response.status}: ${response.statusText}`);
+      return;
+    }
+    
+    const result = await response.json();
+    if (!result.success || !result.data) {
+      console.log('[Menu Categories] 로드 실패');
+      return;
+    }
+    
+    // 견적형 카테고리만 필터링 (부모만)
+    const categories = result.data.filter(cat => cat.category_type === 'quote' && !cat.parent_id);
+    console.log(`[Menu Categories] 로드됨: ${categories.length}개 견적형 카테고리`);
+    
+    const menuContent = get('full-menu-content');
+    if (!menuContent) {
+      console.error('[Menu Categories] full-menu-content 엘리먼트를 찾을 수 없음!');
+      return;
+    }
+    
+    // 카테고리별 자식 매핑
+    const allCategories = result.data;
+    const categoryMap = {};
+    categories.forEach(cat => {
+      categoryMap[cat.id] = allCategories.filter(c => c.parent_id === cat.id);
+    });
+    
+    // 스타일 설정
+    menuContent.style.display = 'flex';
+    menuContent.style.flexDirection = 'column';
+    menuContent.style.gap = '24px';
+    menuContent.style.padding = '24px 40px';
+    menuContent.style.flexWrap = 'nowrap';
+    menuContent.style.alignItems = 'flex-start';
+    
+    // DocumentFragment 사용으로 성능 개선
+    const fragment = document.createDocumentFragment();
+    
+    // 카테고리 코드 매핑 (기존 시스템과 호환)
+    const categoryCodeMap = {
+      '소량 인디고': 'indigo',
+      '흑백 디지털': 'digital',
+      '대량 옵셋': 'offset',
+      '소량 전단': 'flyer_small',
+      '대량 전단': 'flyer_large'
+    };
+    
+    const bindingCodeMap = {
+      '중철': 'staple',
+      '무선': 'perfect'
+    };
+    
+    categories.forEach(cat => {
+      const itemDiv = document.createElement('div');
+      itemDiv.style.cssText = 'display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid #e2e8f0; padding-bottom: 20px; width: 100%;';
+      
+      // 제목
+      const titleDiv = document.createElement('div');
+      titleDiv.style.cssText = 'font-weight: 700; font-size: 16px; color: #0f172a;';
+      titleDiv.textContent = cat.name;
+      itemDiv.appendChild(titleDiv);
+      
+      // 설명
+      if (cat.description) {
+        const descDiv = document.createElement('div');
+        descDiv.style.cssText = 'font-size: 13px; color: #64748b;';
+        descDiv.textContent = cat.description;
+        itemDiv.appendChild(descDiv);
+      }
+      
+      // 자식 카테고리 버튼들
+      const children = categoryMap[cat.id] || [];
+      if (children.length > 0) {
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.style.cssText = 'display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px;';
+        
+        children.forEach(child => {
+          const childBtn = document.createElement('button');
+          childBtn.style.cssText = 'padding: 10px 20px; background: #037a3f; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 14px; font-weight: 600;';
+          childBtn.textContent = child.name;
+          
+          const categoryCode = categoryCodeMap[cat.name];
+          const bindingCode = bindingCodeMap[child.name];
+          
+          // 클릭 이벤트
+          childBtn.addEventListener('click', function() {
+            if (categoryCode && bindingCode) {
+              setCategory(categoryCode, bindingCode);
+              toggleFullMenu(); // 메뉴 닫기
+            } else if (categoryCode) {
+              setCategory(categoryCode);
+              toggleFullMenu();
+            }
+          });
+          
+          // 마우스 이벤트
+          childBtn.addEventListener('mouseenter', function() {
+            this.style.background = '#025a2e';
+            this.style.transform = 'translateY(-2px)';
+          });
+          childBtn.addEventListener('mouseleave', function() {
+            this.style.background = '#037a3f';
+            this.style.transform = 'translateY(0)';
+          });
+          
+          buttonsDiv.appendChild(childBtn);
+        });
+        
+        itemDiv.appendChild(buttonsDiv);
+      } else {
+        // 자식이 없으면 버튼 추가
+        const categoryCode = categoryCodeMap[cat.name];
+        if (categoryCode) {
+          const mainBtn = document.createElement('button');
+          mainBtn.style.cssText = 'padding: 10px 20px; background: #037a3f; color: #fff; border: none; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 14px; font-weight: 600; width: fit-content;';
+          mainBtn.textContent = '견적 요청하기';
+          
+          mainBtn.addEventListener('click', function() {
+            setCategory(categoryCode);
+            toggleFullMenu();
+          });
+          
+          mainBtn.addEventListener('mouseenter', function() {
+            this.style.background = '#025a2e';
+            this.style.transform = 'translateY(-2px)';
+          });
+          mainBtn.addEventListener('mouseleave', function() {
+            this.style.background = '#037a3f';
+            this.style.transform = 'translateY(0)';
+          });
+          
+          itemDiv.appendChild(mainBtn);
+        }
+      }
+      
+      fragment.appendChild(itemDiv);
+    });
+    
+    menuContent.innerHTML = '';
+    menuContent.appendChild(fragment);
+    
+    console.log('[Menu Categories] 렌더링 완료');
+  } catch (err) {
+    console.error('[Menu Categories] 에러:', err);
+  }
+}
+
+async function loadSellableCategoriesForMenu() {
+  try {
+    console.log('[Menu Categories] 로드 시작...');
+    const timestamp = new Date().getTime();
+    const response = await fetch(`/api/categories?type=sellable&parent_only=true&_t=${timestamp}`, {
+      cache: 'no-store',
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    
+    if (!response.ok) {
+      console.error(`[Menu Categories] HTTP ${response.status}: ${response.statusText}`);
+      return;
+    }
+    
+    const result = await response.json();
+    if (!result.success || !result.data) {
+      console.log('[Menu Categories] 로드 실패');
+      return;
+    }
+    
+    const categories = result.data;
+    console.log(`[Menu Categories] 로드됨: ${categories.length}개 부모 카테고리`);
+    
+    const menuContent = get('full-menu-content');
+    if (!menuContent) {
+      console.error('[Menu Categories] full-menu-content 엘리먼트를 찾을 수 없음!');
+      return;
+    }
+    
+    // 스타일 설정
+    menuContent.style.display = 'flex';
+    menuContent.style.flexDirection = 'row';
+    menuContent.style.gap = '16px';
+    menuContent.style.padding = '20px';
+    menuContent.style.flexWrap = 'wrap';
+    menuContent.style.alignItems = 'flex-start';
+    
+    // DocumentFragment 사용으로 성능 개선
+    const fragment = document.createDocumentFragment();
+    
+    categories.forEach(cat => {
+      const cardDiv = document.createElement('div');
+      cardDiv.className = 'menu-category-card';
+      cardDiv.style.cssText = 'display: flex; flex-direction: column; gap: 12px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #fff; transition: all 0.3s; flex: 0 1 280px; min-width: 280px; cursor: pointer;';
+      
+      // 이미지
+      const imageDiv = document.createElement('div');
+      imageDiv.style.cssText = 'width: 100%; height: 140px; flex-shrink: 0; overflow: hidden;';
+      
+      if (cat.image_url) {
+        const img = document.createElement('img');
+        img.src = cat.image_url;
+        img.alt = cat.name;
+        img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; border-radius: 8px;';
+        imageDiv.appendChild(img);
+      } else {
+        imageDiv.style.cssText += 'background: linear-gradient(135deg, #f3f7fb 0%, #e2eef7 100%); display: flex; align-items: center; justify-content: center; border-radius: 8px; font-size: 48px;';
+        imageDiv.textContent = cat.icon || '🎁';
+      }
+      cardDiv.appendChild(imageDiv);
+      
+      // 정보
+      const infoDiv = document.createElement('div');
+      infoDiv.style.cssText = 'flex: 1; padding: 12px; display: flex; flex-direction: column; justify-content: space-between;';
+      infoDiv.dataset.categoryId = cat.id;
+      
+      const titleDiv = document.createElement('div');
+      titleDiv.style.cssText = 'font-weight: 800; font-size: 15px; color: #0f172a; margin-bottom: 4px;';
+      titleDiv.innerHTML = `${cat.icon || '🎁'} ${cat.name}`;
+      infoDiv.appendChild(titleDiv);
+      
+      const descDiv = document.createElement('div');
+      descDiv.style.cssText = 'font-size: 11px; color: #64748b; line-height: 1.4;';
+      descDiv.textContent = cat.description || '상품 보러 가기';
+      infoDiv.appendChild(descDiv);
+      
+      // 자식 카테고리 (간단한 텍스트 리스트)
+      if (cat.children && cat.children.length > 0) {
+        const childrenDiv = document.createElement('div');
+        childrenDiv.style.cssText = 'margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0;';
+        
+        const childLabel = document.createElement('div');
+        childLabel.style.cssText = 'font-size: 10px; font-weight: 600; color: #0f172a; margin-bottom: 6px;';
+        childLabel.textContent = '상품:';
+        childrenDiv.appendChild(childLabel);
+        
+        const childGrid = document.createElement('div');
+        childGrid.style.cssText = 'display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px;';
+        
+        cat.children.forEach(child => {
+          const childBtn = document.createElement('div');
+          childBtn.style.cssText = 'padding: 6px 8px; background: #f1f5f9; border-radius: 4px; text-align: center; cursor: pointer; transition: all 0.2s; font-size: 10px; color: #475569; border: 1px solid #e2e8f0;';
+          childBtn.textContent = child.name;
+          childBtn.dataset.childId = child.id;
+          
+          // 마우스 이벤트
+          childBtn.addEventListener('mouseenter', function() {
+            this.style.background = '#037a3f';
+            this.style.color = '#fff';
+            this.style.borderColor = '#037a3f';
+            this.style.fontWeight = '600';
+          });
+          childBtn.addEventListener('mouseleave', function() {
+            this.style.background = '#f1f5f9';
+            this.style.color = '#475569';
+            this.style.borderColor = '#e2e8f0';
+            this.style.fontWeight = 'normal';
+          });
+          
+          childGrid.appendChild(childBtn);
+        });
+        
+        childrenDiv.appendChild(childGrid);
+        infoDiv.appendChild(childrenDiv);
+      }
+      
+      cardDiv.appendChild(infoDiv);
+      
+      // 카드 마우스 이벤트
+      cardDiv.addEventListener('mouseenter', function() {
+        this.style.boxShadow = '0 8px 20px rgba(0,0,0,0.1)';
+        this.style.transform = 'translateY(-2px)';
+      });
+      cardDiv.addEventListener('mouseleave', function() {
+        this.style.boxShadow = 'none';
+        this.style.transform = 'translateY(0)';
+      });
+      
+      fragment.appendChild(cardDiv);
+    });
+    
+    menuContent.innerHTML = '';
+    menuContent.appendChild(fragment);
+    
+    // 위임(Event Delegation) - 모든 카테고리 클릭 처리
+    menuContent.addEventListener('click', (e) => {
+      const childBtn = e.target.closest('[data-child-id]');
+      if (childBtn) {
+        const childId = childBtn.dataset.childId;
+        goCategory(parseInt(childId));
+        toggleFullMenu();
+        return;
+      }
+      
+      const infoDiv = e.target.closest('[data-category-id]');
+      if (infoDiv && !e.target.closest('[data-child-id]')) {
+        const catId = infoDiv.dataset.categoryId;
+        goCategory(parseInt(catId));
+        toggleFullMenu();
+      }
+    });
+    
+    console.log(`[Menu Categories] 렌더링 완료`);
+  } catch (e) {
+    console.error('[Menu Categories] 로드 실패:', e);
+  }
+}
+
+// ===== 상품 관리 탭 전환 =====
+function switchProductManagementTab(type) {
+  if (type === 'quote') {
+    document.getElementById('quote-products-section').style.display = 'block';
+    document.getElementById('sellable-products-section').style.display = 'none';
+    document.getElementById('tab-quote-products').style.borderColor = '#6366f1';
+    document.getElementById('tab-quote-products').style.color = '#6366f1';
+    document.getElementById('tab-sellable-products').style.borderColor = '#cbd5e1';
+    document.getElementById('tab-sellable-products').style.color = '#64748b';
+  } else {
+    document.getElementById('quote-products-section').style.display = 'none';
+    document.getElementById('sellable-products-section').style.display = 'block';
+    document.getElementById('tab-quote-products').style.borderColor = '#cbd5e1';
+    document.getElementById('tab-quote-products').style.color = '#64748b';
+    document.getElementById('tab-sellable-products').style.borderColor = '#6366f1';
+    document.getElementById('tab-sellable-products').style.color = '#6366f1';
+  }
+}
+
+function goCategory(categoryId) {
+  console.log('[goCategory] ID:', categoryId);
+  // 나중에 카테고리별 상품 페이지로 이동하는 로직 추가
+  alert('카테고리 상품 페이지로 이동합니다. (준비 중)');
 }

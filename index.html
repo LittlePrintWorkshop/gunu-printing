@@ -3,6 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <!-- 캐시 방지 메타 태그 -->
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>건우프린팅 - 소량인쇄부터 대량인쇄까지</title>
   <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iIzI1NjNlYiIvPjx0ZXh0IHg9IjI1NiIgeT0iMzgwIiBmb250LXNpemU9IjI4MCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPkc8L3RleHQ+PC9zdmc+" type="image/svg+xml">
   
@@ -16,117 +20,63 @@
   <script src="https://lite.payapp.kr/public/api/v2/payapp-lite.js"></script>
 
   <link rel="stylesheet" href="style.css">
+  <script src="new_product_system.js"></script>
 </head>
 
 <body>
+  <header class="header">
+    <div class="header-top">
+      <div class="brand" onclick="goHome()">
+        <div class="brand-info" style="display:flex; align-items:center;">
+          <img id="brand-logo" src="" alt="GuNU Printing 로고" style="height:56px; width:auto; display:none;" />
+        </div>
+      </div>
+
+      <nav class="top-nav" id="nav-links"></nav>
+    </div>
+
+    <div class="header-bottom">
+      <div style="display: flex; align-items: center; justify-content: center; width: 100%;">
+        <!-- 탭 메뉴 -->
+        <div class="cat-tabs" id="cat-tabs-container" style="margin: 0;">
+          <a onclick="setCategory('indigo')" class="cat-tab-btn" data-category="indigo">소량 인디고</a>
+          <a onclick="setCategory('digital')" class="cat-tab-btn" data-category="digital">흑백 디지털</a>
+          <a onclick="setCategory('offset')" class="cat-tab-btn" data-category="offset">대량 옵셋</a>
+          <a onclick="setCategory('flyer_small')" class="cat-tab-btn" data-category="flyer_small">소량 전단</a>
+          <a onclick="setCategory('flyer_large')" class="cat-tab-btn" data-category="flyer_large">대량 전단</a>
+        </div>
+      </div>
+      
+      <!-- 전체 메뉴 드롭다운 -->
+      <div class="cat-full-dropdown">
+        <div style="display: flex; align-items: flex-start; justify-content: center; width: 100%; margin-left: -20px;">
+          <!-- 소량 인디고 -->
+          <div style="padding: 20px 40px;">
+            <a onclick="setCategory('indigo', 'staple')" style="display: block; color: #475569; padding: 6px 0; cursor: pointer; font-size: 14px; white-space: nowrap;">중철</a>
+            <a onclick="setCategory('indigo', 'perfect')" style="display: block; color: #475569; padding: 6px 0; cursor: pointer; font-size: 14px; white-space: nowrap;">무선</a>
+          </div>
+          <!-- 흑백 디지털 -->
+          <div style="padding: 20px 50px;">
+            <a onclick="setCategory('digital', 'staple')" style="display: block; color: #475569; padding: 6px 0; cursor: pointer; font-size: 14px; white-space: nowrap;">중철</a>
+            <a onclick="setCategory('digital', 'perfect')" style="display: block; color: #475569; padding: 6px 0; cursor: pointer; font-size: 14px; white-space: nowrap;">무선</a>
+          </div>
+          <!-- 대량 옵셋 -->
+          <div style="padding: 20px 40px;">
+            <a onclick="setCategory('offset', 'staple')" style="display: block; color: #475569; padding: 6px 0; cursor: pointer; font-size: 14px; white-space: nowrap;">중철</a>
+            <a onclick="setCategory('offset', 'perfect')" style="display: block; color: #475569; padding: 6px 0; cursor: pointer; font-size: 14px; white-space: nowrap;">무선</a>
+          </div>
+          <!-- 소량 전단 -->
+          <div style="padding: 20px 40px;">
+          </div>
+          <!-- 대량 전단 -->
+          <div style="padding: 20px 40px;">
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
   <div class="container">
-
-    <header class="header">
-      <div class="header-top">
-        <div class="brand" onclick="goHome()">
-          <div class="brand-info" style="display:flex; align-items:center;">
-            <img id="brand-logo" src="" alt="GuNU Printing 로고" style="height:44px; width:auto; display:none;" />
-          </div>
-        </div>
-
-        <nav class="top-nav" id="nav-links"></nav>
-      </div>
-
-      <div class="header-bottom">
-        <button class="menu-btn" onclick="toggleFullMenu()">☰</button>
-        <div class="cat-nav">
-          <div class="cat-nav-item">
-            <a onclick="setCategory('indigo')" class="cat-link">소량 인디고</a>
-            <div class="cat-dropdown">
-              <a onclick="setCategory('indigo', 'staple')">중철</a>
-              <a onclick="setCategory('indigo', 'perfect')">무선</a>
-            </div>
-          </div>
-          <div class="cat-nav-item">
-            <a onclick="setCategory('digital')" class="cat-link">흑백 디지털</a>
-            <div class="cat-dropdown">
-              <a onclick="setCategory('digital', 'staple')">중철</a>
-              <a onclick="setCategory('digital', 'perfect')">무선</a>
-            </div>
-          </div>
-          <div class="cat-nav-item">
-            <a onclick="setCategory('offset')" class="cat-link">대량 옵셋</a>
-            <div class="cat-dropdown">
-              <a onclick="setCategory('offset', 'staple')">중철</a>
-              <a onclick="setCategory('offset', 'perfect')">무선</a>
-            </div>
-          </div>
-          <a onclick="setCategory('flyer_small')" class="cat-link">소량 전단</a>
-          <a onclick="setCategory('flyer_large')" class="cat-link">대량 전단</a>
-        </div>
-        
-        <div class="full-menu-panel" id="full-menu-panel">
-          <div class="full-menu-content">
-            <div class="full-menu-category-section" id="menu-cat-indigo">
-              <div class="full-menu-category-title">소량 인디고</div>
-              <div class="full-menu-columns">
-                <div class="full-menu-column">
-                  <div class="full-menu-column-title">중철</div>
-                  <a href="#" class="full-menu-column-item" onclick="event.preventDefault(); setCategory('indigo', 'staple'); toggleFullMenu();">소량 인디고 중철</a>
-                </div>
-                <div class="full-menu-column">
-                  <div class="full-menu-column-title">무선</div>
-                  <a href="#" class="full-menu-column-item" onclick="event.preventDefault(); setCategory('indigo', 'perfect'); toggleFullMenu();">소량 인디고 무선</a>
-                </div>
-              </div>
-            </div>
-            
-            <div class="full-menu-category-section" id="menu-cat-digital">
-              <div class="full-menu-category-title">흑백 디지털</div>
-              <div class="full-menu-columns">
-                <div class="full-menu-column">
-                  <div class="full-menu-column-title">중철</div>
-                  <a href="#" class="full-menu-column-item" onclick="event.preventDefault(); setCategory('digital', 'staple'); toggleFullMenu();">흑백 디지털 중철</a>
-                </div>
-                <div class="full-menu-column">
-                  <div class="full-menu-column-title">무선</div>
-                  <a href="#" class="full-menu-column-item" onclick="event.preventDefault(); setCategory('digital', 'perfect'); toggleFullMenu();">흑백 디지털 무선</a>
-                </div>
-              </div>
-            </div>
-            
-            <div class="full-menu-category-section" id="menu-cat-offset">
-              <div class="full-menu-category-title">대량 옵셋</div>
-              <div class="full-menu-columns">
-                <div class="full-menu-column">
-                  <div class="full-menu-column-title">중철</div>
-                  <a href="#" class="full-menu-column-item" onclick="event.preventDefault(); setCategory('offset', 'staple'); toggleFullMenu();">대량 옵셋 중철</a>
-                </div>
-                <div class="full-menu-column">
-                  <div class="full-menu-column-title">무선</div>
-                  <a href="#" class="full-menu-column-item" onclick="event.preventDefault(); setCategory('offset', 'perfect'); toggleFullMenu();">대량 옵셋 무선</a>
-                </div>
-              </div>
-            </div>
-            
-            <div class="full-menu-category-section" id="menu-cat-flyer_small">
-              <div class="full-menu-category-title">소량 전단</div>
-              <div class="full-menu-columns">
-                <div class="full-menu-column">
-                  <div class="full-menu-column-title">소량 전단</div>
-                  <a href="#" class="full-menu-column-item" onclick="event.preventDefault(); setCategory('flyer_small'); toggleFullMenu();">소량 전단</a>
-                </div>
-              </div>
-            </div>
-            
-            <div class="full-menu-category-section" id="menu-cat-flyer_large">
-              <div class="full-menu-category-title">대량 전단</div>
-              <div class="full-menu-columns">
-                <div class="full-menu-column">
-                  <div class="full-menu-column-title">대량 전단</div>
-                  <a href="#" class="full-menu-column-item" onclick="event.preventDefault(); setCategory('flyer_large'); toggleFullMenu();">대량 전단</a>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </header>
 
     <!-- 동적 페이지 렌더링용 컨테이너 (개인결제/완료 화면 등) -->
     <div class="main-content" style="display:none;
@@ -180,9 +130,9 @@
             </div>
 
             <div class="card home-notice" style="margin-top:0;">
-              <div class="notice-head">
-                <div class="ttl">NOTICE</div>
-                <div class="more" onclick="goNoticeList()">더보기</div>
+              <div class="notice-head" style="padding: 6px 18px; border-bottom: 1px solid #e6edf3; display: flex; align-items: center; justify-content: space-between;">
+                <div class="ttl" style="margin: 0; font-size: 11px; font-weight: 1100; letter-spacing: 1px; color: #16a34a;">NOTICE</div>
+                <div class="more" onclick="goNoticeList()" style="font-size: 11px; font-weight: 700; color: #0f172a; cursor: pointer;">더보기</div>
               </div>
               <div class="notice-list" id="home-notice-list"></div>
             </div>
@@ -191,26 +141,37 @@
       </div>
 
         <div class="home-best" style="margin-top: 10px;">
-          <div class="best-head">
+          <div class="best-head" style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
             <div>
-              <p class="best-label">BEST</p>
-              <p class="best-title">베스트 상품</p>
+              <p class="best-label" style="margin: 0; font-size: 11px; font-weight: 1100; letter-spacing: 1px; color: #16a34a;">BEST</p>
             </div>
-            <p class="best-sub">지금 인기 있는 상품 4종</p>
+            <p class="best-sub" style="margin: 0; font-size: 12px; font-weight: 900; color: #64748b;">지금 인기 있는 상품 4종</p>
           </div>
           <div class="best-grid">
             <button class="best-item" data-cat="indigo" onclick="setCategory('indigo'); return false;" aria-label="소량 인디고 견적 이동">
-              <img src="images/1768914051899_20260121_103946.png" alt="소량 인디고" class="best-thumb" onerror="this.style.display='none'; this.parentElement.style.background='#f1f5f9'; const noImg = document.createElement('div'); noImg.style.cssText='width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:14px; font-weight:700;'; noImg.textContent='No Image'; this.parentElement.appendChild(noImg);">
+              <img src="images/1768914051899_20260121_103946.png" alt="소량 인디고" class="best-thumb" onerror="this.style.display='none'; this.parentElement.style.background='#f1f5f9'; const noImg = document.createElement('div'); noImg.style.cssText='width:100%; height:100%; display:flex; align-items:flex-start; justify-content:flex-start; padding:12px; color:#64748b; font-size:14px; font-weight:700;'; noImg.textContent='No Image'; this.parentElement.appendChild(noImg);">
             </button>
             <button class="best-item" data-cat="digital" onclick="setCategory('digital'); return false;" aria-label="흑백 디지털 견적 이동">
-              <img src="images/KakaoTalk_20260121_094315265_20260121_120308.png" alt="흑백 디지털" class="best-thumb" onerror="this.style.display='none'; this.parentElement.style.background='#f1f5f9'; const noImg = document.createElement('div'); noImg.style.cssText='width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:14px; font-weight:700;'; noImg.textContent='No Image'; this.parentElement.appendChild(noImg);">
+              <img src="images/KakaoTalk_20260121_094315265_20260121_120308.png" alt="흑백 디지털" class="best-thumb" onerror="this.style.display='none'; this.parentElement.style.background='#f1f5f9'; const noImg = document.createElement('div'); noImg.style.cssText='width:100%; height:100%; display:flex; align-items:flex-start; justify-content:flex-start; padding:12px; color:#64748b; font-size:14px; font-weight:700;'; noImg.textContent='No Image'; this.parentElement.appendChild(noImg);">
             </button>
             <button class="best-item" data-cat="offset" onclick="setCategory('offset'); return false;" aria-label="대량 옵셋 견적 이동">
-              <img src="images/KakaoTalk_20260121_102449905_20260122_120629.png" alt="대량 옵셋" class="best-thumb" onerror="this.style.display='none'; this.parentElement.style.background='#f1f5f9'; const noImg = document.createElement('div'); noImg.style.cssText='width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:14px; font-weight:700;'; noImg.textContent='No Image'; this.parentElement.appendChild(noImg);">
+              <img src="images/KakaoTalk_20260121_102449905_20260122_120629.png" alt="대량 옵셋" class="best-thumb" onerror="this.style.display='none'; this.parentElement.style.background='#f1f5f9'; const noImg = document.createElement('div'); noImg.style.cssText='width:100%; height:100%; display:flex; align-items:flex-start; justify-content:flex-start; padding:12px; color:#64748b; font-size:14px; font-weight:700;'; noImg.textContent='No Image'; this.parentElement.appendChild(noImg);">
             </button>
             <button class="best-item" data-cat="flyer_small" onclick="setCategory('flyer_small'); return false;" aria-label="소량 전단 견적 이동">
-              <img src="images/KakaoTalk_20260121_102449905_20260123_101237.png" alt="소량 전단" class="best-thumb" onerror="this.style.display='none'; this.parentElement.style.background='#f1f5f9'; const noImg = document.createElement('div'); noImg.style.cssText='width:100%; height:100%; display:flex; align-items:center; justify-content:center; color:#64748b; font-size:14px; font-weight:700;'; noImg.textContent='No Image'; this.parentElement.appendChild(noImg);">
+              <img src="images/KakaoTalk_20260121_102449905_20260123_101237.png" alt="소량 전단" class="best-thumb" onerror="this.style.display='none'; this.parentElement.style.background='#f1f5f9'; const noImg = document.createElement('div'); noImg.style.cssText='width:100%; height:100%; display:flex; align-items:flex-start; justify-content:flex-start; padding:12px; color:#64748b; font-size:14px; font-weight:700;'; noImg.textContent='No Image'; this.parentElement.appendChild(noImg);">
             </button>
+          </div>
+        </div>
+
+        <!-- 카테고리 섹션 -->
+        <div class="home-best" style="margin-top: 10px;">
+          <div class="best-head" style="display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 12px;">
+            <div>
+              <p class="best-label" style="margin: 0; font-size: 11px; font-weight: 1100; letter-spacing: 1px; color: #16a34a;">Products</p>
+            </div>
+          </div>
+          <div class="best-grid" id="home-category-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; max-width: 1600px; margin: 0 auto;">
+            <!-- 판매형 카테고리가 동적으로 로드됨 -->
           </div>
         </div>
 
@@ -448,10 +409,11 @@
     </div>
 
     <div id="view-order" style="display:none;">
-      <div style="max-width:1000px; margin:0 auto;">
+      <div style="max-width:700px; margin:0 auto;">
         <h2 style="margin-top:0; font-weight:1100; color:#0f172a; border-left:4px solid var(--primary); padding-left:12px;">주문 내역</h2>
         
         <div id="order-history-list" style="display:flex; flex-direction:column; gap:15px; margin-bottom:20px;"></div>
+        <div id="order-history-pagination" style="display:flex; justify-content:center; gap:8px; margin-bottom:20px;"></div>
         
         <div id="order-empty" style="display:none; text-align:center; padding:60px 20px; background:#f8fafc; border-radius:16px; border:2px dashed var(--line); color:#64748b;">
           <div style="font-size:48px; margin-bottom:16px;">📦</div>
@@ -481,9 +443,9 @@
     </div>
 
     <div id="view-quotation" style="display:none;">
-      <div style="max-width:1200px; margin:0 auto; padding:20px;">
+      <div style="max-width:1600px; margin:0 auto; padding:20px;">
 
-        <div style="display:grid; grid-template-columns:280px 1fr 340px; gap:20px; align-items:start;">
+        <div style="display:grid; grid-template-columns:500px 1fr 340px; gap:20px; align-items:start;">
           
           <div>
             <div style="border-radius:12px; overflow:hidden; border:1px solid var(--line); background:#ffffff; aspect-ratio:1 / 1; position:relative;">
@@ -493,7 +455,7 @@
                 alt="인디고"
                 style="width:100%; height:100%; object-fit:contain; display:none; background:#ffffff;"
               >
-              <div class="img-placeholder" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background:#f1f5f9; color:#64748b; font-size:18px; font-weight:700;">No Image</div>
+              <div class="img-placeholder" style="position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:flex-start; justify-content:flex-start; padding:12px; background:#f1f5f9; color:#64748b; font-size:18px; font-weight:700;">No Image</div>
             </div>
             
             </div>
@@ -507,7 +469,7 @@
                   <div style="margin-bottom:16px;">
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
                       <label style="font-weight:700; font-size:13px; color:#475569; margin:0; min-width:60px;">사이즈</label>
-                      <select id="ind-bookSize-standard" onchange="updateSizeFromStandard()" style="flex:1; max-width:250px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;">
+                      <select id="ind-bookSize-standard" onchange="updateSizeFromStandard()" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;">
                         <option value="210×297">A4</option>
                         <option value="182×257">B5</option>
                         <option value="148×210">A5</option>
@@ -519,9 +481,9 @@
                       <input type="radio" name="size-type" value="cutting" id="size-cutting" checked style="width:16px; height:16px; cursor:pointer;">
                       <label for="size-cutting" style="font-size:12px; color:#64748b; cursor:pointer; margin:0; min-width:70px;">재단사이즈</label>
                       <div style="display:flex; align-items:center; gap:4px;">
-                        <input type="number" id="ind-size-width" value="210" style="width:70px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-size:12px; font-weight:600; text-align:center;">
+                        <input type="number" id="ind-size-width" value="210" style="width:70px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600; text-align:center;">
                         <span style="font-size:12px; font-weight:700; color:#64748b;">X</span>
-                        <input type="number" id="ind-size-height" value="297" style="width:70px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-size:12px; font-weight:600; text-align:center;">
+                        <input type="number" id="ind-size-height" value="297" style="width:70px; padding:6px 8px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600; text-align:center;">
                         <span style="font-size:11px; font-weight:600; color:#64748b; margin-left:4px;">mm</span>
                       </div>
                     </div>
@@ -530,9 +492,9 @@
                       <input type="radio" name="size-type" value="working" id="size-working" disabled style="width:16px; height:16px; cursor:not-allowed; opacity:0.5;">
                       <label for="size-working" style="font-size:12px; color:#94a3b8; cursor:not-allowed; margin:0; min-width:70px;">작업사이즈</label>
                       <div style="display:flex; align-items:center; gap:4px;">
-                        <input type="number" id="ind-size-working-width" value="214" disabled style="width:70px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:6px; background:#f1f5f9; font-size:12px; font-weight:600; text-align:center; color:#94a3b8; cursor:not-allowed;">
+                        <input type="number" id="ind-size-working-width" value="214" disabled style="width:70px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:0; background:#f1f5f9; font-size:12px; font-weight:600; text-align:center; color:#94a3b8; cursor:not-allowed;">
                         <span style="font-size:12px; font-weight:700; color:#94a3b8;">X</span>
-                        <input type="number" id="ind-size-working-height" value="301" disabled style="width:70px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:6px; background:#f1f5f9; font-size:12px; font-weight:600; text-align:center; color:#94a3b8; cursor:not-allowed;">
+                        <input type="number" id="ind-size-working-height" value="301" disabled style="width:70px; padding:6px 8px; border:1px solid #e2e8f0; border-radius:0; background:#f1f5f9; font-size:12px; font-weight:600; text-align:center; color:#94a3b8; cursor:not-allowed;">
                         <span style="font-size:11px; font-weight:600; color:#94a3b8; margin-left:4px;">mm</span>
                       </div>
                     </div>
@@ -542,22 +504,22 @@
                     <div style="display:flex; align-items:center; gap:12px; margin-bottom:8px;">
                       <label style="font-weight:700; font-size:13px; color:#475569; margin:0; min-width:60px;">수량</label>
                       <div style="display:flex; align-items:center; gap:4px;">
-                        <button type="button" onclick="changeQty(-1)" style="width:32px; height:32px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; cursor:pointer; font-size:16px; font-weight:700; color:#64748b; display:flex; align-items:center; justify-content:center;">-</button>
-                        <input type="number" id="ind-qty" value="" placeholder="0" style="width:80px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; font-size:12px; font-weight:600; text-align:center;">
-                        <button type="button" onclick="changeQty(1)" style="width:32px; height:32px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; cursor:pointer; font-size:16px; font-weight:700; color:#64748b; display:flex; align-items:center; justify-content:center;">+</button>
+                        <button type="button" onclick="changeQty(-1)" style="width:32px; height:32px; border:1px solid #cbd5e1; border-radius:0; background:#fff; cursor:pointer; font-size:16px; font-weight:700; color:#64748b; display:flex; align-items:center; justify-content:center;">-</button>
+                        <input type="number" id="ind-qty" value="" placeholder="0" min="0" oninput="if (this.value < 0) this.value = 0;" style="width:80px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600; text-align:center;">
+                        <button type="button" onclick="changeQty(1)" style="width:32px; height:32px; border:1px solid #cbd5e1; border-radius:0; background:#fff; cursor:pointer; font-size:16px; font-weight:700; color:#64748b; display:flex; align-items:center; justify-content:center;">+</button>
                       </div>
                     </div>
                     <div style="display:flex; gap:6px; margin-left:72px;">
-                      <button type="button" onclick="quickAddQty(1)" style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; cursor:pointer; font-size:11px; font-weight:600; color:#64748b; transition:all 0.2s;">+ 1부</button>
-                      <button type="button" onclick="quickAddQty(10)" style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; cursor:pointer; font-size:11px; font-weight:600; color:#64748b; transition:all 0.2s;">+ 10부</button>
-                      <button type="button" onclick="quickAddQty(100)" style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:6px; background:#fff; cursor:pointer; font-size:11px; font-weight:600; color:#64748b; transition:all 0.2s;">+ 100부</button>
+                      <button type="button" onclick="quickAddQty(1)" style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:0; background:#fff; cursor:pointer; font-size:11px; font-weight:600; color:#64748b; transition:all 0.2s;">+ 1부</button>
+                      <button type="button" onclick="quickAddQty(10)" style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:0; background:#fff; cursor:pointer; font-size:11px; font-weight:600; color:#64748b; transition:all 0.2s;">+ 10부</button>
+                      <button type="button" onclick="quickAddQty(100)" style="padding:6px 12px; border:1px solid #cbd5e1; border-radius:0; background:#fff; cursor:pointer; font-size:11px; font-weight:600; color:#64748b; transition:all 0.2s;">+ 100부</button>
                     </div>
                   </div>
 
                   <div id="ind-area-binding-direction">
                     <div style="display:flex; align-items:center; gap:12px;">
                       <label style="font-weight:700; font-size:13px; color:#475569; margin:0; min-width:60px;">제본방향</label>
-                      <select id="ind-binding-direction" style="flex:1; max-width:250px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;">
+                      <select id="ind-binding-direction" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;">
                         <option value="vertical-left">세로형좌철</option>
                         <option value="vertical-right">세로형우철</option>
                         <option value="horizontal-top">가로형상철</option>
@@ -572,19 +534,19 @@
                 
                 <div id="ind-paper-print-container" style="display:grid; grid-template-columns:1fr 1px 1fr; gap:20px; align-items:start;">
                   <div id="ind-area-cover">
-                    <div style="font-weight:700; font-size:14px; margin-bottom:12px; color:#1e293b; border-bottom:2px solid var(--primary); padding-bottom:6px;" id="ind-title-cover">표지선택</div>
+                    <div style="font-weight:700; font-size:14px; margin-bottom:12px; color:#1e293b; padding-bottom:6px;" id="ind-title-cover">표지선택</div>
                     
                     <div style="margin-bottom:10px;">
                       <label style="font-size:12px; color:#64748b; display:block; margin-bottom:6px; font-weight:700;">용지 상세</label>
                       <div style="display:flex; gap:8px;">
-                        <select id="ind-coverType" onchange="updateIndGram('cover')" style="flex:1; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;"></select>
-                        <select id="ind-coverGram" style="width:100px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;"></select>
+                        <select id="ind-coverType" onchange="updateIndGram('cover')" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;"></select>
+                        <select id="ind-coverGram" style="width:100px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;"></select>
                       </div>
                     </div>
 
                     <div style="margin-bottom:10px;">
                       <label style="font-size:12px; color:#64748b; display:block; margin-bottom:6px; font-weight:700;">인쇄 상세</label>
-                      <select id="ind-coverPrint-select" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1 !important; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600; outline:none !important; box-shadow:none !important;" onfocus="this.style.borderColor='#cbd5e1'; this.style.outline='none'; this.style.boxShadow='none';" onblur="this.style.borderColor='#cbd5e1'; this.style.outline='none'; this.style.boxShadow='none';">
+                      <select id="ind-coverPrint-select" style="padding:8px 10px; border:1px solid #cbd5e1 !important; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600; outline:none !important; box-shadow:none !important;" onfocus="this.style.borderColor='#cbd5e1'; this.style.outline='none'; this.style.boxShadow='none';" onblur="this.style.borderColor='#cbd5e1'; this.style.outline='none'; this.style.boxShadow='none';">
                         <option value="2-color">양면 컬러</option>
                         <option value="2-mono">양면 흑백</option>
                         <option value="1-color">단면 컬러</option>
@@ -598,7 +560,7 @@
 
                     <div style="margin-bottom:10px;">
                       <label style="font-size:12px; color:#64748b; display:block; margin-bottom:6px; font-weight:700;">페이지</label>
-                      <select id="ind-coverPages" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;">
+                      <select id="ind-coverPages" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;">
                         <option value="" selected>페이지선택</option>
                         <option value="2">2p</option>
                         <option value="4">4p</option>
@@ -607,7 +569,7 @@
 
                     <div>
                       <label style="font-size:12px; color:#64748b; display:block; margin-bottom:6px; font-weight:700;">코팅 상세</label>
-                      <select id="ind-coating-select" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;">
+                      <select id="ind-coating-select" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;">
                         <option value="0" selected>코팅없음</option>
                         <option value="1">단면무광코팅</option>
                         <option value="3">단면유광코팅</option>
@@ -620,19 +582,19 @@
                   <div id="ind-paper-print-divider" style="background:#e2e8f0; width:1px; height:100%;"></div>
 
                   <div id="ind-area-inner">
-                    <div style="font-weight:700; font-size:14px; margin-bottom:12px; color:#1e293b; border-bottom:2px solid var(--primary); padding-bottom:6px;" id="ind-title-inner">내지선택</div>
+                    <div style="font-weight:700; font-size:14px; margin-bottom:12px; color:#1e293b; padding-bottom:6px;" id="ind-title-inner">내지선택</div>
                     
                     <div style="margin-bottom:10px;">
                       <label style="font-size:12px; color:#64748b; display:block; margin-bottom:6px; font-weight:700;">용지 상세</label>
                       <div style="display:flex; gap:8px;">
-                        <select id="ind-innerType" onchange="updateIndGram('inner')" style="flex:1; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;"></select>
-                        <select id="ind-innerGram" style="width:100px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;"></select>
+                        <select id="ind-innerType" onchange="updateIndGram('inner')" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;"></select>
+                        <select id="ind-innerGram" style="width:100px; padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;"></select>
                       </div>
                     </div>
 
                     <div style="margin-bottom:10px;">
                       <label style="font-size:12px; color:#64748b; display:block; margin-bottom:6px; font-weight:700;">인쇄 상세</label>
-                      <select id="ind-innerPrint-select" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1 !important; border-color:#cbd5e1 !important; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600; outline:none !important; box-shadow:none !important;" onfocus="this.style.setProperty('border-color', '#cbd5e1', 'important'); this.style.setProperty('outline', 'none', 'important'); this.style.setProperty('box-shadow', 'none', 'important'); this.style.setProperty('border', '1px solid #cbd5e1', 'important');" onblur="this.style.setProperty('border-color', '#cbd5e1', 'important'); this.style.setProperty('outline', 'none', 'important'); this.style.setProperty('box-shadow', 'none', 'important'); this.style.setProperty('border', '1px solid #cbd5e1', 'important');" onmousedown="this.style.setProperty('border-color', '#cbd5e1', 'important');" onmouseup="this.style.setProperty('border-color', '#cbd5e1', 'important');">
+                      <select id="ind-innerPrint-select" style="padding:8px 10px; border:1px solid #cbd5e1 !important; border-color:#cbd5e1 !important; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600; outline:none !important; box-shadow:none !important;" onfocus="this.style.setProperty('border-color', '#cbd5e1', 'important'); this.style.setProperty('outline', 'none', 'important'); this.style.setProperty('box-shadow', 'none', 'important'); this.style.setProperty('border', '1px solid #cbd5e1', 'important');" onblur="this.style.setProperty('border-color', '#cbd5e1', 'important'); this.style.setProperty('outline', 'none', 'important'); this.style.setProperty('box-shadow', 'none', 'important'); this.style.setProperty('border', '1px solid #cbd5e1', 'important');" onmousedown="this.style.setProperty('border-color', '#cbd5e1', 'important');" onmouseup="this.style.setProperty('border-color', '#cbd5e1', 'important');">
                         <option value="2-color">양면 컬러</option>
                         <option value="2-mono">양면 흑백</option>
                         <option value="1-color">단면 컬러</option>
@@ -646,7 +608,7 @@
 
                     <div id="ind-area-inner-pages">
                       <label style="font-size:12px; color:#64748b; display:block; margin-bottom:6px; font-weight:700;">페이지</label>
-                      <select id="ind-innerPages" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:12px; font-weight:600;">
+                      <select id="ind-innerPages" style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:12px; font-weight:600;">
                         </select>
                     </div>
                   </div>
@@ -673,17 +635,17 @@
               <!-- 마진율 입력: 관리자에서만 관리, 고객 화면에서는 숨김 -->
               <div style="margin-top:18px; margin-bottom:18px; display:none;">
                 <label style="display:block; font-weight:700; font-size:13px; margin-bottom:8px; color:#475569;">마진율 (%)</label>
-                <input type="number" id="ind-margin" value="30" style="width:100%; padding:12px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; font-size:14px; font-weight:600;">
+                <input type="number" id="ind-margin" value="30" style="width:120px; padding:12px; border:1px solid #cbd5e1; border-radius:0; background:#f8fafc; font-size:14px; font-weight:600;">
               </div>
 
               <div style="margin-top:18px;">
-                <button class="btn btn-primary" onclick="calculateIndigo()" style="width:100%; padding:14px; font-size:15px; font-weight:700;">견적 계산하기</button>
+                <button class="btn btn-primary" onclick="calculateIndigo()" style="padding:14px; font-size:15px; font-weight:700;">견적 계산하기</button>
               </div>
             </div>
           </div>
 
           <div style="position:sticky; top:70px; height:fit-content; align-self:start;">
-            <div style="background:#1a2332; color:#fff; border-radius:16px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
+            <div style="background:#1a2332; color:#fff; border-radius:0; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.2);">
               <div style="font-weight:700; font-size:13px; margin-bottom:20px; color:#cbd5e1;">견적 요약서</div>
               
               <div style="display:flex; justify-content:space-between; margin-bottom:12px; font-size:13px; color:#cbd5e1;">
@@ -707,7 +669,7 @@
                 <strong style="color:#f8fafc;" id="sum-ship">-</strong>
               </div>
               
-              <div style="text-align:center; padding:12px; background:rgba(16,185,129,.1); border-radius:8px; margin-bottom:18px;">
+              <div style="text-align:center; padding:12px; background:rgba(16,185,129,.1); border-radius:0; margin-bottom:18px;">
                 <div style="font-size:11px; color:#cbd5e1; margin-bottom:4px;">최종 합계</div>
                 <div style="font-size:28px; font-weight:900; color:#10b981;" id="sum-total">0원</div>
               </div>
@@ -716,12 +678,12 @@
               <button id="btn-order-now" class="btn" style="width:100%; padding:12px; background:#10b981; color:#fff; border:none; font-weight:700;" onclick="orderDirectlyFromQuote()">바로주문하기</button>
             </div>
 
-            <div style="background:#1a2332; color:#fff; border-radius:16px; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.2); margin-top:16px;">
+            <div style="background:#1a2332; color:#fff; border-radius:0; padding:20px; box-shadow:0 10px 30px rgba(0,0,0,0.2); margin-top:16px;">
               <div style="font-weight:700; font-size:13px; margin-bottom:12px; color:#cbd5e1;">📎 파일 첨부</div>
               <div style="font-size:11px; color:#94a3b8; margin-bottom:10px;">인쇄할 파일을 첨부하세요 (PDF, AI, PSD 등)</div>
               
               <input type="file" id="quote-file-input" multiple accept=".pdf,.ai,.psd,.jpg,.jpeg,.png,.zip" style="display:none;" onchange="handleQuoteFileUpload(event)">
-              <button onclick="document.getElementById('quote-file-input').click()" style="width:100%; padding:10px; background:#334155; color:#cbd5e1; border:1px dashed #475569; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.3s;">
+              <button onclick="document.getElementById('quote-file-input').click()" style="width:100%; padding:10px; background:#334155; color:#cbd5e1; border:1px dashed #475569; border-radius:0; cursor:pointer; font-size:12px; font-weight:600; transition:all 0.3s;">
                 📁 파일 선택하기
               </button>
               
@@ -831,17 +793,17 @@
       <div id="admin-panel" style="display:none; max-width:1600px; margin:20px auto; padding:0 20px;">
         <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
           <button class="btn" style="background:var(--home-primary); color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-orders')">📊 주문 관리</button>
-          <button class="btn" style="background:#64748b; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-content')">📝 상품 관리</button>
+          <button class="btn" style="background:#6366f1; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-categories')">🏷️ 카테고리 관리</button>
+          <button class="btn" style="background:#64748b; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-content')">📝 상품 관리 (기존)</button>
+          <button class="btn" style="background:#ec4899; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-products')">🎁 상품/판매 관리</button>
           <button class="btn" style="background:#64748b; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-users')">👥 회원 관리</button>
           <button class="btn" style="background:#10b981; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-payment-links')">💳 개인결제 링크</button>
           <button class="btn" style="background:#3b82f6; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-homepage')">🏠 홈페이지 관리</button>
           <button class="btn" style="background:#f59e0b; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-popup')">📢 팝업 관리</button>
           <button class="btn" style="background:#8b5cf6; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-notice')">📋 공지사항 관리</button>
+          <button class="btn" style="background:#06b6d4; color:#fff; border:none; flex:1; min-width:150px;" onclick="showAdminTab('adm-pricing')">💰 가격 관리</button>
           <button class="btn" style="background:#ef4444; color:#fff; border:none; flex:1; min-width:150px;" onclick="resetAllData()">🔄 데이터 초기화</button>
-          <button class="btn" style="background:#64748b; color:#fff; border:none; flex:1; min-width:150px;" onclick="adminLogout()">로그아웃</button>
-        </div>
-
-        <div id="adm-orders" class="card">
+        </div>        <div id="adm-orders" class="card">
           <div style="padding:16px; border-bottom:1px solid var(--line); background:#f8fafc; font-weight:1000;">📊 접수된 주문 리스트</div>
           
           <!-- 날짜 필터 섹션 -->
@@ -863,58 +825,74 @@
             
             <!-- 주문 상태별 통계 -->
             <div style="display:flex; gap:30px; flex-wrap:wrap; justify-content:space-around; padding:24px 0; width:100%;">
-              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('completed')">
-                <div style="width:80px; height:80px; background:#10b981; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">✓</div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('주문접수')">
+                <div style="width:80px; height:80px; background:#f59e0b; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">📦</div>
                 <div style="text-align:center;">
-                  <div style="font-size:12px; color:#64748b; font-weight:600;">신규주문</div>
-                  <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="stat-completed">0건</div>
+                  <div style="font-size:12px; color:#64748b; font-weight:600;">주문접수</div>
+                  <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="stat-pending">0건</div>
                 </div>
               </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('preparing')">
+              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('제작중')">
                 <div style="width:80px; height:80px; background:#3b82f6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">⚙️</div>
                 <div style="text-align:center;">
-                  <div style="font-size:12px; color:#64748b; font-weight:600;">준비중</div>
+                  <div style="font-size:12px; color:#64748b; font-weight:600;">제작중</div>
                   <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="stat-preparing">0건</div>
                 </div>
               </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('shipping')">
+              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('배송중')">
                 <div style="width:80px; height:80px; background:#8b5cf6; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">🚚</div>
                 <div style="text-align:center;">
-                  <div style="font-size:12px; color:#64748b; font-weight:600;">배송진행</div>
+                  <div style="font-size:12px; color:#64748b; font-weight:600;">배송중</div>
                   <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="stat-shipping">0건</div>
                 </div>
               </div>
-              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('delivered')">
-                <div style="width:80px; height:80px; background:#6366f1; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">🎁</div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:12px; cursor:pointer; flex:0 1 auto;" onclick="filterAdminOrderByStatus('배송완료')">
+                <div style="width:80px; height:80px; background:#10b981; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:bold; color:#fff; box-shadow:0 4px 12px rgba(0,0,0,0.15); transition:transform 0.2s, box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.05)'; this.style.boxShadow='0 6px 16px rgba(0,0,0,0.2)';" onmouseout="this.style.transform='scale(1)'; this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';">✓</div>
                 <div style="text-align:center;">
                   <div style="font-size:12px; color:#64748b; font-weight:600;">배송완료</div>
-                  <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="stat-delivered">0건</div>
+                  <div style="font-size:16px; font-weight:bold; color:#0f172a;" id="stat-completed">0건</div>
                 </div>
               </div>
             </div>
           </div>
           
           <div style="padding:18px; border-bottom:1px solid var(--line);">
-            <div style="display:flex; gap:10px; align-items:center;">
-              <input type="text" id="adm-order-search" placeholder="주문번호 또는 고객명 검색..." style="flex:1; padding:10px; border-radius:8px; border:1px solid #cbd5e1; background:#f8fafc; font-size:13px;">
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <input type="text" id="adm-order-search" placeholder="주문번호 또는 고객명 검색..." style="width:300px; padding:10px; border-radius:8px; border:1px solid #cbd5e1; background:#f8fafc; font-size:13px;">
               <button onclick="searchAdminOrders()" class="btn" style="background:var(--home-primary); color:#fff; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer;">검색</button>
               <button onclick="get('adm-order-search').value=''; searchAdminOrders();" class="btn" style="background:#e2e8f0; color:#64748b; border:none; padding:10px 20px; border-radius:8px; font-weight:600; cursor:pointer;">초기화</button>
+              <span id="shipping-tools" style="display:none; display:flex; gap:8px; align-items:center; border-left:1px solid #cbd5e1; padding-left:10px; margin-left:10px;">
+                <button onclick="document.getElementById('shipping-file-input').click()" class="btn" style="background:#10b981; color:#fff; border:none; padding:8px 16px; border-radius:0; font-weight:600; cursor:pointer; font-size:12px;">📥 엑셀 업로드</button>
+                <button onclick="downloadShippingExcel()" class="btn" style="background:#3b82f6; color:#fff; border:none; padding:8px 16px; border-radius:0; font-weight:600; cursor:pointer; font-size:12px;">📥 엑셀 다운로드</button>
+                <button onclick="downloadOrderInvoices()" class="btn" style="background:#8b5cf6; color:#fff; border:none; padding:8px 16px; border-radius:0; font-weight:600; cursor:pointer; font-size:12px;">📋 내역서 JPG</button>
+                <input type="file" id="shipping-file-input" accept=".xlsx,.xls" style="display:none;" onchange="handleShippingExcelUpload(event)">
+                <button onclick="bulkUpdateOrderStatus('preparing')" class="btn" style="background:#f59e0b; color:#fff; border:none; padding:8px 16px; border-radius:0; font-weight:600; cursor:pointer; font-size:12px;">📝 제작</button>
+                <button onclick="bulkUpdateOrderStatus('shipping')" class="btn" style="background:#0891b2; color:#fff; border:none; padding:8px 16px; border-radius:0; font-weight:600; cursor:pointer; font-size:12px;">📦 배송</button>
+                <button onclick="bulkUpdateOrderStatus('completed')" class="btn" style="background:#10b981; color:#fff; border:none; padding:8px 16px; border-radius:0; font-weight:600; cursor:pointer; font-size:12px;">✅ 배송완료</button>
+                <button onclick="bulkUpdateOrderStatus('취소')" class="btn" style="background:#ec4899; color:#fff; border:none; padding:8px 16px; border-radius:0; font-weight:600; cursor:pointer; font-size:12px;">❌ 주문취소</button>
+                <button onclick="bulkDeleteOrders()" class="btn" style="background:#ef4444; color:#fff; border:none; padding:8px 16px; border-radius:0; font-weight:600; cursor:pointer; font-size:12px;">🗑️ 삭제</button>
+              </span>
             </div>
           </div>
           <div style="padding:18px; overflow-x:auto;">
-            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <table id="order-list-table" style="table-layout:fixed; width:1190px; border-collapse:collapse; font-size:13px;">
               <thead>
                 <tr style="background:#f8fafc; border-bottom:2px solid var(--line);">
-                  <th style="padding:10px; text-align:left; font-weight:1000;">주문번호</th>
-                  <th style="padding:10px; text-align:left; font-weight:1000;">주문일</th>
-                  <th style="padding:10px; text-align:left; font-weight:1000;">주문자</th>
-                  <th style="padding:10px; text-align:left; font-weight:1000;">내용</th>
-                  <th style="padding:10px; text-align:left; font-weight:1000;">금액</th>
-                  <th style="padding:10px; text-align:center; font-weight:1000;">관리</th>
+                  <th data-col="0" style="padding:10px; text-align:center; font-weight:1000; width:60px; min-width:60px; position:relative;">
+                    <input type="checkbox" id="order-list-check-all" onclick="toggleAllOrderListChecks(this)" style="width:16px; height:16px; cursor:pointer;">
+                    <div class="col-resizer"></div>
+                  </th>
+                  <th data-col="1" style="padding:10px; text-align:left; font-weight:1000; width:180px; min-width:180px; position:relative;">주문번호<div class="col-resizer"></div></th>
+                  <th data-col="2" style="padding:10px; text-align:left; font-weight:1000; width:180px; min-width:180px; position:relative;">주문일<div class="col-resizer"></div></th>
+                  <th data-col="3" style="padding:10px; text-align:left; font-weight:1000; width:100px; min-width:100px; position:relative;">주문자<div class="col-resizer"></div></th>
+                  <th data-col="4" style="padding:10px; text-align:left; font-weight:1000; width:200px; min-width:200px; position:relative;">배송지<div class="col-resizer"></div></th>
+                  <th data-col="5" style="padding:10px; text-align:left; font-weight:1000; width:150px; min-width:150px; position:relative;">내용<div class="col-resizer"></div></th>
+                  <th data-col="6" style="padding:10px; text-align:left; font-weight:1000; width:120px; min-width:120px; position:relative;">금액<div class="col-resizer"></div></th>
+                  <th data-col="7" style="padding:10px; text-align:center; font-weight:1000; width:200px; min-width:200px;">관리</th>
                 </tr>
               </thead>
               <tbody id="order-list-body">
-                <tr><td colspan="6" style="padding:30px; text-align:center; color:#64748b;">주문을 불러오는 중입니다...</td></tr>
+                <tr><td colspan="8" style="padding:30px; text-align:center; color:#64748b;">주문을 불러오는 중입니다...</td></tr>
               </tbody>
             </table>
           </div>
@@ -948,7 +926,7 @@
               <section style="background:#fff; border:1px solid var(--line); border-radius:12px; padding:28px; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
                 <div style="display:flex; gap:12px; align-items:center; margin-bottom:24px; padding-bottom:20px; border-bottom:2px solid #f1f5f9; flex-wrap:wrap;">
                   <label style="font-weight:700; font-size:12px; color:#475569; white-space:nowrap; line-height:1.5;">편집 상품:</label>
-                  <select id="adm-cat-select" onchange="loadAdminContent()" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-weight:600; font-size:12px; min-width:100px;">
+                  <select id="adm-cat-select" onchange="(async () => { await loadAdminContent(); })()" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-weight:600; font-size:12px; min-width:100px;">
                     <option value="indigo">소량 인디고</option>
                     <option value="digital">흑백 디지털</option>
                     <option value="offset">대량 옵셋</option>
@@ -958,7 +936,7 @@
 
                   <div id="binding-select-wrapper" style="display:flex; gap:12px; align-items:center;">
                     <label style="font-weight:700; font-size:12px; color:#475569; white-space:nowrap; line-height:1.5;">제본:</label>
-                    <select id="adm-binding-select" onchange="loadAdminContent()" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-weight:600; font-size:12px; min-width:80px;">
+                    <select id="adm-binding-select" onchange="(async () => { await loadAdminContent(); })()" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; font-weight:600; font-size:12px; min-width:80px;">
                       <option value="staple">중철</option>
                       <option value="perfect">무선</option>
                     </select>
@@ -1055,45 +1033,52 @@
           <div style="padding:18px; display:grid; gap:12px;">
             <div style="display:flex; justify-content:space-between; align-items:center;">
               <label style="font-weight:700;">메인 슬라이더 이미지</label>
-              <button class="btn btn-primary" onclick="addSlide()" style="padding:6px 12px; font-size:12px;">+ 슬라이드 추가</button>
+              <button class="btn btn-primary" onclick="addSlide()" style="padding:8px 16px; font-size:12px; border-radius:0;">+ 슬라이드 추가</button>
             </div>
             <div id="adm-slides-container" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
 
             <label style="font-weight:700; margin-top:8px;">헤더 로고 (선택)</label>
             <div style="display:flex; gap:8px; align-items:center;">
-              <img id="adm-home-logo-preview" src="" alt="로고" style="width:120px; height:36px; object-fit:contain; border:1px solid #e2e8f0; border-radius:8px; display:block; background:#fff;">
+              <img id="adm-home-logo-preview" src="" alt="로고" style="width:120px; height:36px; object-fit:contain; border:1px solid #e2e8f0; border-radius:0; display:block; background:#fff;">
               <input type="file" id="adm-home-logo-file" accept="image/*" onchange="handleHomepageImageUpload(event, 'logo')">
             </div>
 
             <label style="font-weight:700; margin-top:8px;">파비콘 (브라우저 탭 아이콘) - 권장 사이즈: 512×512px</label>
             <div style="display:flex; gap:8px; align-items:center;">
-              <img id="adm-home-favicon-preview" src="" alt="파비콘" style="width:64px; height:64px; object-fit:contain; border:1px solid #e2e8f0; border-radius:6px; display:none; background:#fff; padding:4px;">
+              <img id="adm-home-favicon-preview" src="" alt="파비콘" style="width:64px; height:64px; object-fit:contain; border:1px solid #e2e8f0; border-radius:0; display:none; background:#fff; padding:4px;">
               <input type="file" id="adm-home-favicon-file" accept="image/*" onchange="handleHomepageImageUpload(event, 'favicon')">
             </div>
 
-            <div style="display:flex; gap:8px; margin-top:6px;">
-              <button class="btn btn-primary" onclick="saveHomepageContent()">저장</button>
-              <button class="btn" onclick="applyHomepageContent(true)" style="background:#e2e8f0; color:#475569;">미리보기 적용</button>
-              <button class="btn" onclick="resetHomepageCache()" style="background:#ef4444; color:#fff; border:none;">캐시 초기화</button>
+            <div style="display:flex; gap:8px; margin-top:12px;">
+              <button class="btn btn-primary" onclick="saveHomepageContent()" style="border-radius:0; padding:10px 20px;">저장</button>
+              <button class="btn" onclick="applyHomepageContent(true)" style="background:#e2e8f0; color:#475569; border-radius:0; padding:10px 20px;">미리보기 적용</button>
+              <button class="btn" onclick="resetHomepageCache()" style="background:#ef4444; color:#fff; border:none; border-radius:0; padding:10px 20px;">캐시 초기화</button>
             </div>
           </div>
         </div>
 
         <div id="adm-popup" style="display:none;" class="card">
           <div style="padding:16px; border-bottom:1px solid var(--line); background:#f8fafc; font-weight:1000;">📢 팝업 공지사항 관리</div>
-          <div style="padding:18px;">
-            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:20px;">
+          <div style="padding:18px; display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+            <!-- 팝업 목록 (왼쪽) -->
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
+              <h3 style="margin:0 0 12px 0; font-weight:700; font-size:13px; color:#0f172a;">팝업 목록</h3>
+              <div id="admin-popup-list" style="display:flex; flex-direction:column; gap:8px; max-height:600px; overflow-y:auto;"></div>
+            </div>
+
+            <!-- 새 팝업 추가 (오른쪽) -->
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
               <h3 style="margin:0 0 16px 0; font-weight:700; font-size:13px; color:#0f172a;">새 팝업 추가</h3>
               
               <div style="margin-bottom:12px;">
                 <label style="display:block; font-weight:700; font-size:12px; margin-bottom:6px; color:#475569;">제목</label>
                 <input type="hidden" id="popup-id">
-                <input type="text" id="popup-title" placeholder="팝업 제목 입력" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; box-sizing:border-box;">
+                <input type="text" id="popup-title" placeholder="팝업 제목 입력" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; font-size:12px; box-sizing:border-box;">
               </div>
 
               <div style="margin-bottom:12px;">
                 <label style="display:block; font-weight:700; font-size:12px; margin-bottom:6px; color:#475569;">내용</label>
-                <textarea id="popup-content" placeholder="팝업 내용 입력" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; min-height:100px; font-family:inherit; resize:vertical; box-sizing:border-box;"></textarea>
+                <textarea id="popup-content" placeholder="팝업 내용 입력" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; font-size:12px; min-height:100px; font-family:inherit; resize:vertical; box-sizing:border-box;"></textarea>
               </div>
 
               <div style="margin-bottom:12px;">
@@ -1110,7 +1095,7 @@
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
                 <div>
                   <label style="display:block; font-weight:700; font-size:12px; margin-bottom:6px; color:#475569;">뱃지(선택)</label>
-                  <input type="text" id="popup-badge" placeholder="예: 점검공지" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; box-sizing:border-box;">
+                  <input type="text" id="popup-badge" placeholder="예: 점검공지" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; font-size:12px; box-sizing:border-box;">
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; margin-top:22px;">
                   <input type="checkbox" id="popup-active" checked>
@@ -1118,30 +1103,32 @@
                 </div>
               </div>
 
-              <div style="display:flex; gap:8px;">
-                <button class="btn btn-primary" onclick="savePopupNotice()" style="flex:1; padding:10px; font-size:12px; font-weight:600;">팝업 저장</button>
-                <button class="btn" onclick="resetPopupForm()" style="flex:1; padding:10px; font-size:12px; font-weight:600; background:#e2e8f0; color:#475569; border:none;">초기화</button>
-                <button class="btn" onclick="deletePopupNotice()" style="flex:1; padding:10px; font-size:12px; font-weight:600; background:#ef4444; color:#fff; border:none;">팝업 삭제</button>
+              <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="btn btn-primary" onclick="savePopupNotice()" style="padding:10px 20px; font-size:12px; font-weight:600; border-radius:0;">팝업 저장</button>
+                <button class="btn" onclick="resetPopupForm()" style="padding:10px 20px; font-size:12px; font-weight:600; background:#e2e8f0; color:#475569; border:none; border-radius:0;">초기화</button>
+                <button class="btn" onclick="deletePopupNotice()" style="padding:10px 20px; font-size:12px; font-weight:600; background:#ef4444; color:#fff; border:none; border-radius:0;">팝업 삭제</button>
               </div>
-            </div>
-
-            <div style="border-top:1px solid #e2e8f0; padding-top:16px;">
-              <h3 style="margin:0 0 12px 0; font-weight:700; font-size:13px; color:#0f172a;">팝업 목록</h3>
-              <div id="admin-popup-list" style="display:flex; flex-direction:column; gap:8px; max-height:400px; overflow-y:auto;"></div>
             </div>
           </div>
         </div>
 
         <div id="adm-notice" style="display:none;" class="card">
           <div style="padding:16px; border-bottom:1px solid var(--line); background:#f8fafc; font-weight:1000;">📋 공지사항 관리</div>
-          <div style="padding:18px;">
-            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-bottom:20px;">
+          <div style="padding:18px; display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+            <!-- 공지사항 목록 (왼쪽) -->
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
+              <h3 style="margin:0 0 12px 0; font-weight:700; font-size:13px; color:#0f172a;">공지사항 목록</h3>
+              <div id="admin-notice-list" style="display:flex; flex-direction:column; gap:8px; max-height:600px; overflow-y:auto;"></div>
+            </div>
+
+            <!-- 새 공지사항 추가 (오른쪽) -->
+            <div style="background:#fff; border:1px solid #e2e8f0; border-radius:8px; padding:16px;">
               <h3 style="margin:0 0 16px 0; font-weight:700; font-size:13px; color:#0f172a;">새 공지사항 추가</h3>
               
               <div style="margin-bottom:12px;">
                 <label style="display:block; font-weight:700; font-size:12px; margin-bottom:6px; color:#475569;">제목</label>
                 <input type="hidden" id="notice-id">
-                <input type="text" id="notice-title" placeholder="공지사항 제목 입력" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; box-sizing:border-box;">
+                <input type="text" id="notice-title" placeholder="공지사항 제목 입력" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; font-size:12px; box-sizing:border-box;">
               </div>
 
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px;">
@@ -1161,19 +1148,14 @@
 
               <div style="margin-bottom:12px;">
                 <label style="display:block; font-weight:700; font-size:12px; margin-bottom:6px; color:#475569;">내용</label>
-                <textarea id="notice-content" placeholder="공지사항 내용 입력" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; min-height:100px; font-family:inherit; resize:vertical; box-sizing:border-box;"></textarea>
+                <textarea id="notice-content" placeholder="공지사항 내용 입력" style="width:100%; padding:8px 10px; border:1px solid #cbd5e1; border-radius:0; font-size:12px; min-height:100px; font-family:inherit; resize:vertical; box-sizing:border-box;"></textarea>
               </div>
 
-              <div style="display:flex; gap:8px;">
-                <button class="btn btn-primary" onclick="saveNotice()" style="flex:1; padding:10px; font-size:12px; font-weight:600;">공지사항 저장</button>
-                <button class="btn" onclick="resetNoticeForm()" style="flex:1; padding:10px; font-size:12px; font-weight:600; background:#e2e8f0; color:#475569; border:none;">초기화</button>
-                <button class="btn" onclick="deleteNotice()" style="flex:1; padding:10px; font-size:12px; font-weight:600; background:#ef4444; color:#fff; border:none;">공지 삭제</button>
+              <div style="display:flex; gap:8px; margin-top:12px;">
+                <button class="btn btn-primary" onclick="saveNotice()" style="padding:10px 20px; font-size:12px; font-weight:600; border-radius:0;">공지사항 저장</button>
+                <button class="btn" onclick="resetNoticeForm()" style="padding:10px 20px; font-size:12px; font-weight:600; background:#e2e8f0; color:#475569; border:none; border-radius:0;">초기화</button>
+                <button class="btn" onclick="deleteNotice()" style="padding:10px 20px; font-size:12px; font-weight:600; background:#ef4444; color:#fff; border:none; border-radius:0;">공지 삭제</button>
               </div>
-            </div>
-
-            <div style="border-top:1px solid #e2e8f0; padding-top:16px;">
-              <h3 style="margin:0 0 12px 0; font-weight:700; font-size:13px; color:#0f172a;">공지사항 목록</h3>
-              <div id="admin-notice-list" style="display:flex; flex-direction:column; gap:8px; max-height:400px; overflow-y:auto;"></div>
             </div>
           </div>
         </div>
@@ -1331,12 +1313,200 @@
             </table>
           </div>
         </div>
+
+        <!-- 비용 관리 탭 -->
+        <div id="adm-pricing" style="display:none;" class="card">
+          <div style="padding:16px; border-bottom:1px solid var(--line); background:#f8fafc; font-weight:1000;">💰 가격 관리 (통합)</div>
+          <div style="padding:18px;">
+            
+            <!-- 탭 네비게이션 -->
+            <div style="display:flex; gap:8px; margin-bottom:20px; border-bottom:1px solid #e2e8f0; flex-wrap:wrap;">
+              <button class="pricing-tab-btn active" onclick="switchPricingTab('paper')" style="padding:12px 16px; background:none; border:none; border-bottom:2px solid #0066cc; color:#0066cc; font-weight:600; cursor:pointer; font-size:13px;">📄 종이 가격</button>
+              <button class="pricing-tab-btn" onclick="switchPricingTab('printing')" style="padding:12px 16px; background:none; border:none; border-bottom:2px solid transparent; color:#666; font-weight:600; cursor:pointer; font-size:13px;">🖨️ 인쇄비</button>
+              <button class="pricing-tab-btn" onclick="switchPricingTab('margin')" style="padding:12px 16px; background:none; border:none; border-bottom:2px solid transparent; color:#666; font-weight:600; cursor:pointer; font-size:13px;">💰 마진율</button>
+              <button class="pricing-tab-btn" onclick="switchPricingTab('shipping')" style="padding:12px 16px; background:none; border:none; border-bottom:2px solid transparent; color:#666; font-weight:600; cursor:pointer; font-size:13px;">🚚 배송비</button>
+            </div>
+
+            <!-- [1] 종이 가격 탭 -->
+            <div id="pricing-tab-paper" style="display:block;">
+              <div id="paper-prices-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(350px, 1fr)); gap:12px; margin-bottom:20px;">
+                <!-- 동적으로 생성됨 -->
+              </div>
+            </div>
+
+            <!-- [2] 인쇄비 탭 -->
+            <div id="pricing-tab-printing" style="display:none;">
+              <div id="printing-costs-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px;">
+                <!-- 동적으로 생성됨 -->
+              </div>
+            </div>
+
+            <!-- [3] 마진율 탭 -->
+            <div id="pricing-tab-margin" style="display:none;">
+              <div id="margin-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px;">
+                <!-- 동적으로 생성됨 -->
+              </div>
+            </div>
+
+            <!-- [4] 배송비 탭 -->
+            <div id="pricing-tab-shipping" style="display:none;">
+              <div id="shipping-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:12px;">
+                <!-- 동적으로 생성됨 -->
+              </div>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-top:16px;">
+              <button class="btn btn-primary" onclick="savePricingAllChanges()" style="padding:10px 20px; font-size:12px; font-weight:600; border-radius:0;">모든 변경사항 저장</button>
+              <button class="btn" onclick="loadPricingData()" style="padding:10px 20px; font-size:12px; font-weight:600; background:#e2e8f0; color:#475569; border:none; border-radius:0;">새로 고침</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 구 adm-paper-settings 삭제됨 - pricing-functions.js의 tabbed 인터페이스로 통합됨 -->
+        
+        <!-- 신규: 카테고리 관리 탭 -->
+        <div id="adm-categories" style="display:none;" class="card">
+          <div style="padding:20px; border-bottom:1px solid var(--line); background:#f8fafc;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-weight:1000; font-size:16px;">🏷️ 카테고리 관리</span>
+              <button onclick="openAddCategoryModal()" class="btn btn-primary" style="padding:10px 16px; font-size:13px; white-space:nowrap;">[+] 새 카테고리 추가</button>
+            </div>
+          </div>
+          <div style="padding:20px;">
+            <!-- 견적형 카테고리 섹션 -->
+            <div style="margin-bottom:30px;">
+              <h3 style="font-weight:800; font-size:14px; margin-bottom:12px; color:#0f172a;">📌 견적형 카테고리 (맞춤 인쇄)</h3>
+              <div id="quote-categories-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+                <!-- 동적으로 생성됨 -->
+              </div>
+            </div>
+            
+            <!-- 판매형 카테고리 섹션 -->
+            <div>
+              <h3 style="font-weight:800; font-size:14px; margin-bottom:12px; color:#0f172a;">🎁 판매형 카테고리 (기성품)</h3>
+              <div id="sellable-categories-list" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+                <!-- 동적으로 생성됨 -->
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 신규: 상품 관리 (이중 시스템) 탭 -->
+        <div id="adm-products" style="display:none;" class="card">
+          <div style="padding:20px; border-bottom:1px solid var(--line); background:#f8fafc;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+              <span style="font-weight:1000; font-size:16px;">🎁 상품/판매 관리</span>
+              <button onclick="openAddProductModal()" class="btn btn-primary" style="padding:10px 16px; font-size:13px; white-space:nowrap;">[+] 새 상품 추가</button>
+            </div>
+            
+            <!-- 탭 선택 -->
+            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+              <button class="btn" onclick="switchProductManagementTab('quote')" id="tab-quote-products" style="padding:8px 14px; font-size:12px; background:#fff; border:2px solid #6366f1; color:#6366f1; border-radius:6px; font-weight:600; cursor:pointer;">📌 견적형 상품</button>
+              <button class="btn" onclick="switchProductManagementTab('sellable')" id="tab-sellable-products" style="padding:8px 14px; font-size:12px; background:#fff; border:2px solid #cbd5e1; color:#64748b; border-radius:6px; font-weight:600; cursor:pointer;">🎁 판매형 상품</button>
+              
+              <!-- 엑셀 관련 버튼 -->
+              <div style="margin-left:auto; display:flex; gap:8px;">
+                <button onclick="downloadProductTemplate()" class="btn" style="padding:8px 14px; font-size:12px; background:#fff; border:2px solid #10b981; color:#10b981; border-radius:6px; font-weight:600; cursor:pointer;">📥 템플릿 다운로드</button>
+                <button onclick="downloadProductsExcel()" class="btn" style="padding:8px 14px; font-size:12px; background:#fff; border:2px solid #3b82f6; color:#3b82f6; border-radius:6px; font-weight:600; cursor:pointer;">📥 엑셀 다운로드</button>
+                <button onclick="triggerExcelUpload()" class="btn" style="padding:8px 14px; font-size:12px; background:#fff; border:2px solid #f59e0b; color:#f59e0b; border-radius:6px; font-weight:600; cursor:pointer;">📤 엑셀 업로드</button>
+                <input type="file" id="excel-upload-input" style="display:none;" accept=".xlsx,.xls,.csv" onchange="uploadProductsExcel()">
+              </div>
+            </div>
+          </div>
+          
+          <div style="padding:20px;">
+            <!-- 필터 & 검색 영역 -->
+            <div style="display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; align-items:flex-end;">
+              <!-- 카테고리 필터 -->
+              <div>
+                <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">카테고리</label>
+                <select id="adm-product-category-filter" onchange="filterAndLoadProducts()" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; min-width:140px;">
+                  <option value="">-- 전체 --</option>
+                </select>
+              </div>
+              
+              <!-- 상태 필터 -->
+              <div>
+                <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">상태</label>
+                <select id="adm-product-status-filter" onchange="filterAndLoadProducts()" style="padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; min-width:120px;">
+                  <option value="">-- 전체 --</option>
+                  <option value="true">활성</option>
+                  <option value="false">비활성</option>
+                </select>
+              </div>
+              
+              <!-- 검색 -->
+              <div style="flex:1; min-width:200px;">
+                <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">검색</label>
+                <input type="text" id="adm-product-search" placeholder="상품명, SKU 검색..." onkeyup="filterAndLoadProducts()" style="width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:12px;">
+              </div>
+              
+              <!-- 새로고침 -->
+              <button onclick="filterAndLoadProducts()" class="btn" style="padding:8px 14px; background:#e2e8f0; border:1px solid #cbd5e1; border-radius:6px; font-size:12px; font-weight:600; color:#475569; cursor:pointer;">새로고침</button>
+            </div>
+            
+            <!-- 일괄 작업 버튼 영역 -->
+            <div id="adm-product-bulk-actions" style="display:none; margin-bottom:16px; padding:12px; background:#f0f9ff; border:1px solid #bae6fd; border-radius:6px; display:flex; gap:8px; align-items:center;">
+              <span style="font-size:12px; font-weight:600; color:#0369a1;"><span id="adm-selected-count">0</span>개 선택</span>
+              <button onclick="bulkDeleteProducts()" class="btn" style="padding:6px 12px; background:#ef4444; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer;">일괄 삭제</button>
+              <button onclick="bulkToggleStatus(true)" class="btn" style="padding:6px 12px; background:#22c55e; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer;">일괄 활성화</button>
+              <button onclick="bulkToggleStatus(false)" class="btn" style="padding:6px 12px; background:#6b7280; color:#fff; border:none; border-radius:4px; font-size:12px; cursor:pointer;">일괄 비활성화</button>
+            </div>
+            
+            <!-- 견적형 상품 목록 (테이블) -->
+            <div id="quote-products-section" style="display:block;">
+              <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                  <thead>
+                    <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                      <th style="padding:12px; text-align:center; font-weight:700; color:#475569; width:40px;">
+                        <input type="checkbox" id="adm-select-all" onchange="toggleSelectAll(this)" style="cursor:pointer;">
+                      </th>
+                      <th style="padding:12px; text-align:left; font-weight:700; color:#475569;">상품명</th>
+                      <th style="padding:12px; text-align:left; font-weight:700; color:#475569;">카테고리</th>
+                      <th style="padding:12px; text-align:center; font-weight:700; color:#475569;">SKU</th>
+                      <th style="padding:12px; text-align:center; font-weight:700; color:#475569;">상태</th>
+                      <th style="padding:12px; text-align:center; font-weight:700; color:#475569; width:180px;">작업</th>
+                    </tr>
+                  </thead>
+                  <tbody id="quote-products-list">
+                    <tr><td colspan="6" style="padding:30px; text-align:center; color:#94a3b8;">로딩 중...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            
+            <!-- 판매형 상품 목록 (테이블) -->
+            <div id="sellable-products-section" style="display:none;">
+              <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:12px;">
+                  <thead>
+                    <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                      <th style="padding:12px; text-align:center; font-weight:700; color:#475569; width:40px;">
+                        <input type="checkbox" id="adm-select-all-sellable" onchange="toggleSelectAll(this)" style="cursor:pointer;">
+                      </th>
+                      <th style="padding:12px; text-align:left; font-weight:700; color:#475569;">상품명</th>
+                      <th style="padding:12px; text-align:left; font-weight:700; color:#475569;">카테고리</th>
+                      <th style="padding:12px; text-align:center; font-weight:700; color:#475569;">SKU</th>
+                      <th style="padding:12px; text-align:right; font-weight:700; color:#475569;">가격</th>
+                      <th style="padding:12px; text-align:center; font-weight:700; color:#475569;">상태</th>
+                      <th style="padding:12px; text-align:center; font-weight:700; color:#475569; width:180px;">작업</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sellable-products-list">
+                    <tr><td colspan="7" style="padding:30px; text-align:center; color:#94a3b8;">로딩 중...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <footer style="background:#f5f5f5; border-top:1px solid #e0e0e0; padding:40px 0; margin-top:32px;">
-      <div style="max-width:1200px; margin:0 auto; padding:0 20px;">
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:32px; margin-bottom:36px;">
+    <footer style="background:#fff; border-top:1px solid #e0e0e0; padding:40px 0; margin-top:32px;">
+      <div style="max-width:1600px; margin:0 auto; padding:0 20px;">
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:80px; margin-bottom:36px;">
           
           <!-- 고객센터 -->
           <div>
@@ -1448,9 +1618,105 @@
     </div>
   </div>
 
+  <!-- ==================== 상품 추가 모달 (옵션 기능 포함) ==================== -->
+  <div id="add-product-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:5000; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:12px; max-width:900px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+      <!-- 모달 헤더 -->
+      <div style="padding:24px; border-bottom:2px solid #e2e8f0; background:#f8fafc; display:flex; justify-content:space-between; align-items:center; position:sticky; top:0;">
+        <h2 style="margin:0; font-size:20px; font-weight:900; color:#0f172a;">🎁 새 상품 추가</h2>
+        <button onclick="closeAddProductModal()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#94a3b8;">✕</button>
+      </div>
+
+      <!-- 모달 콘텐츠 -->
+      <form id="product-form" style="padding:24px; display:grid; gap:20px;">
+        <!-- 상품 기본 정보 -->
+        <div style="border:1px solid #e2e8f0; border-radius:8px; padding:16px; background:#f9fafb;">
+          <h3 style="margin:0 0 16px 0; font-weight:800; font-size:14px; color:#0f172a;">📦 기본 정보</h3>
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+            <!-- 상품 타입 -->
+            <div>
+              <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">상품 타입 *</label>
+              <select id="product-type" onchange="updateProductFormDisplay()" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                <option value="">-- 선택 --</option>
+                <option value="quote">📌 견적형</option>
+                <option value="sellable">🎁 판매형</option>
+              </select>
+            </div>
+
+            <!-- 카테고리 -->
+            <div>
+              <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">카테고리 *</label>
+              <select id="product-category" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px;">
+                <option value="">-- 선택 --</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 상품명 -->
+          <div style="margin-bottom:12px;">
+            <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">상품명 *</label>
+            <input type="text" id="product-name" placeholder="상품명 입력" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
+          </div>
+
+          <!-- 마진율 -->
+          <div>
+            <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">마진율 (%)</label>
+            <input type="number" id="product-margin" placeholder="기본값: 0" value="0" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
+          </div>
+        </div>
+
+        <!-- 판매형 상품 - 기본 가격 -->
+        <div id="sellable-price-section" style="display:none; border:1px solid #e2e8f0; border-radius:8px; padding:16px; background:#f9fafb;">
+          <h3 style="margin:0 0 16px 0; font-weight:800; font-size:14px; color:#0f172a;">💰 기본 가격</h3>
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div>
+              <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">판매가 *</label>
+              <input type="number" id="product-price" placeholder="0" value="0" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
+            </div>
+
+            <div>
+              <label style="font-weight:700; font-size:12px; color:#475569; display:block; margin-bottom:6px;">초기 재고</label>
+              <input type="number" id="product-quantity" placeholder="0" value="0" style="width:100%; padding:10px; border:1px solid #cbd5e1; border-radius:6px; font-size:13px; box-sizing:border-box;">
+            </div>
+          </div>
+        </div>
+
+        <!-- 옵션 설정 (판매형만) -->
+        <div id="options-section" style="display:none; border:2px solid #667eea; border-radius:8px; padding:16px; background:#f0f4ff;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+            <h3 style="margin:0; font-weight:800; font-size:14px; color:#0f172a;">⚙️ 상품 옵션</h3>
+            <button type="button" onclick="addOptionGroup()" style="padding:6px 12px; background:#667eea; color:#fff; border:none; border-radius:4px; font-size:12px; font-weight:600; cursor:pointer;">+ 옵션 추가</button>
+          </div>
+
+          <div id="option-groups-container" style="display:flex; flex-direction:column; gap:12px;">
+            <!-- 옵션 그룹이 동적으로 추가됨 -->
+          </div>
+        </div>
+
+        <!-- 옵션 조합 가격 설정 -->
+        <div id="option-variants-section" style="display:none; border:2px solid #f59e0b; border-radius:8px; padding:16px; background:#fffbf0;">
+          <h3 style="margin:0 0 16px 0; font-weight:800; font-size:14px; color:#0f172a;">🔀 옵션 조합별 가격</h3>
+          
+          <div id="option-variants-list" style="display:flex; flex-direction:column; gap:12px;">
+            <!-- 옵션 조합이 동적으로 표시됨 -->
+          </div>
+        </div>
+
+        <!-- 버튼 -->
+        <div style="display:flex; gap:12px; margin-top:20px; padding-top:20px; border-top:1px solid #e2e8f0;">
+          <button type="button" onclick="closeAddProductModal()" style="flex:1; padding:12px; background:#e2e8f0; color:#475569; border:1px solid #cbd5e1; border-radius:6px; font-weight:600; cursor:pointer; font-size:13px;">취소</button>
+          <button type="button" onclick="submitAddProduct()" style="flex:1; padding:12px; background:#037a3f; color:#fff; border:none; border-radius:6px; font-weight:600; cursor:pointer; font-size:13px;">상품 추가</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script src="slide_popup_functions.js?v=20260124g"></script>
   <script src="payment_link_functions.js?v=20260124p"></script>
   <script src="script.js?v=20260124r"></script>
+  <script src="pricing-functions.js?v=20260127b"></script>
   
   <!-- ==================== 개인결제 링크 관리 ====================  -->
   <script>
